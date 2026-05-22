@@ -15,6 +15,7 @@ from .features import (
     apply_resize_attack,
     extract_feature_vector,
     load_grayscale,
+    select_feature_array,
 )
 
 
@@ -31,6 +32,7 @@ def evaluate_robustness(
     sample_paths: List[str],
     sample_labels: np.ndarray,
     feature_cfg: FeatureConfig,
+    feature_set: str = "all",
     rng_seed: int = 42,
 ) -> pd.DataFrame:
     rng = np.random.default_rng(rng_seed)
@@ -57,6 +59,7 @@ def evaluate_robustness(
                 feats.append(extract_feature_vector(image, feature_cfg))
 
             X = np.asarray(feats, dtype=np.float32)
+            X = select_feature_array(X, feature_cfg, feature_set)
             pred = model.predict(X)
             results.append(
                 RobustnessResult(

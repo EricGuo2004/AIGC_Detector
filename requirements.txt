@@ -6,3 +6,6 @@ lightgbm
 pillow
 tqdm
 joblib
+matplotlib
+ipython
+notebook
