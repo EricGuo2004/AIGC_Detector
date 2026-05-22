@@ -71,7 +71,8 @@ function Run-Experiment {
     "--lgbm-profile", "wide",
     "--model-set", "lightgbm",
     "--model-architecture", $ModelArchitecture,
-    "--train-augmentation", $TrainAugmentation
+    "--train-augmentation", $TrainAugmentation,
+    "--resume-completed-tasks"
   )
   if ($CalibrateThreshold) {
     $args += "--calibrate-threshold"

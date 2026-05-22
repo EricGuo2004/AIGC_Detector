@@ -107,6 +107,11 @@ def parse_args() -> argparse.Namespace:
         help="Per-label sampling fraction for smoke test. Default is 0.1.",
     )
     parser.add_argument("--sample-seed", type=int, default=42, help="Random seed for sample subsetting")
+    parser.add_argument(
+        "--resume-completed-tasks",
+        action="store_true",
+        help="Skip a task when its metrics_summary.json and model_comparison.csv already exist.",
+    )
     return parser.parse_args()
 
 
@@ -193,6 +198,11 @@ def cached_subsample(
     return samples
 
 
+def task_output_complete(out_dir: Path, task_name: str) -> bool:
+    task_dir = out_dir / task_name
+    return (task_dir / "metrics_summary.json").exists() and (task_dir / "model_comparison.csv").exists()
+
+
 def discover_subsource_samples(dataset_root: Path, split: str) -> List[Sample]:
     samples = discover_ai_subsource_split(dataset_root, split)
     if not samples:
@@ -245,72 +255,36 @@ def main() -> None:
     for r in model_roots:
         print(f"  - {r}")
 
-    train_binary = cached_subsample(
-        sample_cache_dir,
-        "binary_ai_vs_nature",
-        "train",
-        args.sample_fraction,
-        args.sample_seed,
-        args.sample_seed,
-        lambda: discover_binary_split_multi_root(used_root, "train"),
-    )
-    val_binary = cached_subsample(
-        sample_cache_dir,
-        "binary_ai_vs_nature",
-        "val",
-        args.sample_fraction,
-        args.sample_seed,
-        args.sample_seed + 1,
-        lambda: discover_binary_split_multi_root(used_root, "val"),
-    )
-    validate_non_empty(train_binary, "train")
-    validate_non_empty(val_binary, "val")
-    run_task(
-        task_name="binary_ai_vs_nature",
-        train_samples=train_binary,
-        val_samples=val_binary,
-        out_dir=out_dir,
-        cfg=cfg,
-        run_robustness=not args.skip_robustness,
-        lightgbm_device=args.lightgbm_device,
-        num_workers=args.num_workers,
-        feature_chunksize=args.feature_chunksize,
-        feature_cache_dir=feature_cache_dir,
-        cache_tag=cache_tag,
-        feature_set=args.feature_set,
-        lightgbm_profile=args.lgbm_profile,
-        model_set=args.model_set,
-        model_architecture=args.model_architecture,
-        train_augmentation=args.train_augmentation,
-        calibrate_threshold=args.calibrate_threshold,
-    )
-
-    train_sub = cached_subsample(
-        sample_cache_dir,
-        "ai_subsource_attribution",
-        "train",
-        args.sample_fraction,
-        args.sample_seed,
-        args.sample_seed,
-        lambda: discover_subsource_samples(used_root, "train"),
-    )
-    val_sub = cached_subsample(
-        sample_cache_dir,
-        "ai_subsource_attribution",
-        "val",
-        args.sample_fraction,
-        args.sample_seed,
-        args.sample_seed + 1,
-        lambda: discover_subsource_samples(used_root, "val"),
-    )
-    if train_sub and val_sub and len({s.label for s in train_sub}) >= 2:
+    if args.resume_completed_tasks and task_output_complete(out_dir, "binary_ai_vs_nature"):
+        print(f"[resume] Skip completed task: {out_dir / 'binary_ai_vs_nature'}")
+    else:
+        train_binary = cached_subsample(
+            sample_cache_dir,
+            "binary_ai_vs_nature",
+            "train",
+            args.sample_fraction,
+            args.sample_seed,
+            args.sample_seed,
+            lambda: discover_binary_split_multi_root(used_root, "train"),
+        )
+        val_binary = cached_subsample(
+            sample_cache_dir,
+            "binary_ai_vs_nature",
+            "val",
+            args.sample_fraction,
+            args.sample_seed,
+            args.sample_seed + 1,
+            lambda: discover_binary_split_multi_root(used_root, "val"),
+        )
+        validate_non_empty(train_binary, "train")
+        validate_non_empty(val_binary, "val")
         run_task(
-            task_name="ai_subsource_attribution",
-            train_samples=train_sub,
-            val_samples=val_sub,
+            task_name="binary_ai_vs_nature",
+            train_samples=train_binary,
+            val_samples=val_binary,
             out_dir=out_dir,
             cfg=cfg,
-            run_robustness=False,
+            run_robustness=not args.skip_robustness,
             lightgbm_device=args.lightgbm_device,
             num_workers=args.num_workers,
             feature_chunksize=args.feature_chunksize,
@@ -323,8 +297,49 @@ def main() -> None:
             train_augmentation=args.train_augmentation,
             calibrate_threshold=args.calibrate_threshold,
         )
+    if args.resume_completed_tasks and task_output_complete(out_dir, "ai_subsource_attribution"):
+        print(f"[resume] Skip completed task: {out_dir / 'ai_subsource_attribution'}")
     else:
-        print("Skip ai_subsource_attribution in smoke test.")
+        train_sub = cached_subsample(
+            sample_cache_dir,
+            "ai_subsource_attribution",
+            "train",
+            args.sample_fraction,
+            args.sample_seed,
+            args.sample_seed,
+            lambda: discover_subsource_samples(used_root, "train"),
+        )
+        val_sub = cached_subsample(
+            sample_cache_dir,
+            "ai_subsource_attribution",
+            "val",
+            args.sample_fraction,
+            args.sample_seed,
+            args.sample_seed + 1,
+            lambda: discover_subsource_samples(used_root, "val"),
+        )
+        if train_sub and val_sub and len({s.label for s in train_sub}) >= 2:
+            run_task(
+                task_name="ai_subsource_attribution",
+                train_samples=train_sub,
+                val_samples=val_sub,
+                out_dir=out_dir,
+                cfg=cfg,
+                run_robustness=False,
+                lightgbm_device=args.lightgbm_device,
+                num_workers=args.num_workers,
+                feature_chunksize=args.feature_chunksize,
+                feature_cache_dir=feature_cache_dir,
+                cache_tag=cache_tag,
+                feature_set=args.feature_set,
+                lightgbm_profile=args.lgbm_profile,
+                model_set=args.model_set,
+                model_architecture=args.model_architecture,
+                train_augmentation=args.train_augmentation,
+                calibrate_threshold=args.calibrate_threshold,
+            )
+        else:
+            print("Skip ai_subsource_attribution in smoke test.")
 
     print("\nSmoke test done. Check outputs_smoke/ for results.")
 

@@ -22,8 +22,10 @@ from tqdm import tqdm
 
 try:
     from lightgbm import LGBMClassifier
+    from lightgbm.basic import LightGBMError
 except Exception:  # pragma: no cover
     LGBMClassifier = None
+    LightGBMError = None
 
 
 @dataclass
@@ -104,6 +106,48 @@ def _lgbm_classifier(
     return LGBMClassifier(**params)
 
 
+def _sanitize_feature_matrix(X: np.ndarray) -> np.ndarray:
+    X = np.asarray(X, dtype=np.float32)
+    X = np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+    return np.ascontiguousarray(X)
+
+
+def _is_lgbm_model(model: object) -> bool:
+    return LGBMClassifier is not None and isinstance(model, LGBMClassifier)
+
+
+def _is_lgbm_gpu_model(model: object) -> bool:
+    if not _is_lgbm_model(model):
+        return False
+    params = model.get_params()
+    return str(params.get("device_type", params.get("device", "cpu"))).lower() == "gpu"
+
+
+def _is_lgbm_error(exc: Exception) -> bool:
+    return LightGBMError is not None and isinstance(exc, LightGBMError)
+
+
+def _cpu_lgbm_clone(model: object) -> object:
+    if not _is_lgbm_model(model):
+        return model
+    params = model.get_params()
+    params.pop("device_type", None)
+    params.pop("device", None)
+    return LGBMClassifier(**params)
+
+
+def _fit_estimator(model: object, X: np.ndarray, y: np.ndarray, context: str) -> object:
+    X = _sanitize_feature_matrix(X)
+    try:
+        return model.fit(X, y)
+    except Exception as exc:
+        if _is_lgbm_gpu_model(model) and _is_lgbm_error(exc):
+            print(f"[LightGBM fallback] {context}: GPU training failed; retrying on CPU. Error: {exc}")
+            cpu_model = _cpu_lgbm_clone(model)
+            return cpu_model.fit(X, y)
+        raise
+
+
 def _predict_proba(model: object, X: np.ndarray, groups: Sequence[str] | None = None) -> np.ndarray | None:
     if hasattr(model, "predict_proba_with_context"):
         return model.predict_proba_with_context(X, groups)
@@ -121,7 +165,7 @@ def _predict(model: object, X: np.ndarray, groups: Sequence[str] | None = None) 
 def _fit(model: object, X: np.ndarray, y: np.ndarray, groups: Sequence[str] | None = None) -> object:
     if hasattr(model, "fit_with_context"):
         return model.fit_with_context(X, y, groups)
-    return model.fit(X, y)
+    return _fit_estimator(model, X, y, context=model.__class__.__name__)
 
 
 class ThresholdCalibratedBinaryClassifier:
@@ -135,10 +179,16 @@ class ThresholdCalibratedBinaryClassifier:
         return getattr(self.base_model, "feature_importances_", np.asarray([]))
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "ThresholdCalibratedBinaryClassifier":
+        X = _sanitize_feature_matrix(X)
         if self.enabled and len(np.unique(y)) == 2 and min(np.bincount(y.astype(int))) >= 10:
             idx = np.arange(len(y))
             train_idx, cal_idx = train_test_split(idx, test_size=0.2, random_state=42, stratify=y)
-            self.base_model.fit(X[train_idx], y[train_idx])
+            self.base_model = _fit_estimator(
+                self.base_model,
+                X[train_idx],
+                y[train_idx],
+                context="threshold calibration base model",
+            )
             proba = self.base_model.predict_proba(X[cal_idx])[:, 1]
             best_threshold = 0.5
             best_score = -1.0
@@ -149,7 +199,7 @@ class ThresholdCalibratedBinaryClassifier:
                     best_score = score
                     best_threshold = float(threshold)
             self.threshold = best_threshold
-        self.base_model.fit(X, y)
+        self.base_model = _fit_estimator(self.base_model, X, y, context="threshold calibrated binary model")
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
@@ -189,7 +239,7 @@ class HierarchicalAttributionClassifier:
     def fit(self, X: np.ndarray, y: np.ndarray) -> "HierarchicalAttributionClassifier":
         if self.adm_idx is None or self.vqdm_idx is None or len(np.unique(y)) < 3:
             self.fallback_model = _lgbm_classifier(True, self.lightgbm_device, self.lightgbm_profile)
-            self.fallback_model.fit(X, y)
+            self.fallback_model = _fit_estimator(self.fallback_model, X, y, context="hierarchical attribution fallback")
             return self
 
         group_labels = []
@@ -202,12 +252,17 @@ class HierarchicalAttributionClassifier:
         group_to_id = {name: idx for idx, name in enumerate(self.group_names)}
         y_group = np.asarray([group_to_id[g] for g in group_labels], dtype=np.int64)
         self.primary_model = _lgbm_classifier(len(np.unique(y_group)) > 2, self.lightgbm_device, self.lightgbm_profile)
-        self.primary_model.fit(X, y_group)
+        self.primary_model = _fit_estimator(self.primary_model, X, y_group, context="hierarchical attribution primary")
 
         expert_mask = np.isin(y, [self.adm_idx, self.vqdm_idx])
         y_expert = (y[expert_mask] == self.vqdm_idx).astype(int)
         self.expert_model = _lgbm_classifier(False, self.lightgbm_device, self.lightgbm_profile, random_state=43)
-        self.expert_model.fit(X[expert_mask], y_expert)
+        self.expert_model = _fit_estimator(
+            self.expert_model,
+            X[expert_mask],
+            y_expert,
+            context="hierarchical attribution ADM-VQDM expert",
+        )
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
@@ -253,13 +308,13 @@ class PairwiseOVOAttributionClassifier:
         classes = sorted(int(c) for c in np.unique(y))
         if len(classes) < 3:
             self.fallback_model = _lgbm_classifier(False, self.lightgbm_device, self.lightgbm_profile)
-            self.fallback_model.fit(X, y)
+            self.fallback_model = _fit_estimator(self.fallback_model, X, y, context="pairwise OVO fallback")
             return self
         for a, b in combinations(classes, 2):
             mask = np.isin(y, [a, b])
             y_pair = (y[mask] == b).astype(int)
             model = _lgbm_classifier(False, self.lightgbm_device, self.lightgbm_profile, random_state=100 + a * 10 + b)
-            model.fit(X[mask], y_pair)
+            model = _fit_estimator(model, X[mask], y_pair, context=f"pairwise OVO attribution {a}-vs-{b}")
             self.models[(a, b)] = model
         return self
 
@@ -301,6 +356,7 @@ class GeneratorExpertBinaryClassifier:
         y: np.ndarray,
         groups: Sequence[str] | None = None,
     ) -> "GeneratorExpertBinaryClassifier":
+        X = _sanitize_feature_matrix(X)
         self.global_model.fit(X, y)
         if groups is None:
             return self
@@ -310,7 +366,7 @@ class GeneratorExpertBinaryClassifier:
             if mask.sum() < 20 or len(np.unique(y[mask])) < 2:
                 continue
             model = _lgbm_classifier(False, self.lightgbm_device, self.lightgbm_profile, random_state=200 + len(self.experts))
-            model.fit(X[mask], y[mask])
+            model = _fit_estimator(model, X[mask], y[mask], context=f"binary generator expert {group}")
             self.experts[str(group)] = model
         return self
 
@@ -426,6 +482,8 @@ def train_and_select(
     train_groups: Sequence[str] | None = None,
     val_groups: Sequence[str] | None = None,
 ) -> Tuple[TrainOutput, List[TrainOutput]]:
+    X_train = _sanitize_feature_matrix(X_train)
+    X_val = _sanitize_feature_matrix(X_val)
     multiclass = len(np.unique(y_train)) > 2
     candidates = build_models(
         multiclass=multiclass,
@@ -440,7 +498,7 @@ def train_and_select(
 
     candidate_items = list(candidates.items())
     for name, model in tqdm(candidate_items, desc="Training candidate models", leave=False):
-        _fit(model, X_train, y_train, train_groups)
+        model = _fit(model, X_train, y_train, train_groups)
         pred = _predict(model, X_val, val_groups)
         proba = _predict_proba(model, X_val, val_groups)
         metrics = evaluate_predictions(y_val, pred, proba)
