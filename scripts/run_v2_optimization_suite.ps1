@@ -5,6 +5,7 @@ param(
   [int]$NumWorkers = 16,
   [int]$FeatureChunksize = 32,
   [int]$SampleSeed = 42,
+  [string[]]$SkipArchitectures = @("hierarchical_attribution"),
   [switch]$Force,
   [switch]$SkipFull
 )
@@ -144,8 +145,19 @@ Write-Host "[best feature] $bestFeature combined=$($bestFeatureRow.combined_macr
 Write-Host "[phase3] model architecture screening on best feature"
 $architectures = @("hierarchical_attribution", "pairwise_ovo_attribution", "binary_expert_ensemble")
 foreach ($arch in $architectures) {
-  Run-Experiment -Name "outputs_v2_5pct_${bestFeature}_${arch}" -Fraction 0.05 -FeatureProfile $bestFeature -ModelArchitecture $arch -CalibrateThreshold
-  Build-V2Assets
+  if ($SkipArchitectures -contains $arch) {
+    Write-Host "[skip] outputs_v2_5pct_${bestFeature}_${arch} skipped by -SkipArchitectures"
+    continue
+  }
+
+  try {
+    Run-Experiment -Name "outputs_v2_5pct_${bestFeature}_${arch}" -Fraction 0.05 -FeatureProfile $bestFeature -ModelArchitecture $arch -CalibrateThreshold
+    Build-V2Assets
+  } catch {
+    Write-Warning "Model architecture experiment failed and will be skipped: outputs_v2_5pct_${bestFeature}_${arch}"
+    Write-Warning $_.Exception.Message
+    Build-V2Assets
+  }
 }
 
 $bestRow = Get-BestV2RowByPrefix "outputs_v2_5pct_"
