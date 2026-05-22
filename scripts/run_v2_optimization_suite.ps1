@@ -6,6 +6,7 @@ param(
   [int]$FeatureChunksize = 32,
   [int]$SampleSeed = 42,
   [string[]]$SkipArchitectures = @("hierarchical_attribution"),
+  [string]$ScaleModelArchitecture = "flat",
   [switch]$Force,
   [switch]$SkipFull
 )
@@ -168,34 +169,40 @@ $bestFeature = $bestRow.feature_profile
 $bestArch = $bestRow.model_architecture
 Write-Host "[best 5pct config] feature=$bestFeature arch=$bestArch combined=$($bestRow.combined_macro_f1)"
 
+$scaleArch = $bestArch
+if ($ScaleModelArchitecture -ne "") {
+  $scaleArch = $ScaleModelArchitecture
+  Write-Host "[scale config] using feature=$bestFeature arch=$scaleArch for scale-up"
+}
+
 Write-Host "[phase4] scale-up best config"
-Run-Experiment -Name "outputs_v2_20pct_best" -Fraction 0.20 -FeatureProfile $bestFeature -ModelArchitecture $bestArch -CalibrateThreshold
+Run-Experiment -Name "outputs_v2_20pct_best" -Fraction 0.20 -FeatureProfile $bestFeature -ModelArchitecture $scaleArch -CalibrateThreshold
 Build-V2Assets
 
-Run-Experiment -Name "outputs_v2_50pct_best" -Fraction 0.50 -FeatureProfile $bestFeature -ModelArchitecture $bestArch -CalibrateThreshold
+Run-Experiment -Name "outputs_v2_50pct_best" -Fraction 0.50 -FeatureProfile $bestFeature -ModelArchitecture $scaleArch -CalibrateThreshold
 Build-V2Assets
 
 $bestScaleRow = Get-BestV2RowByPrefix "outputs_v2_50pct_best"
 if (($null -ne $bestScaleRow) -and ([double]$bestScaleRow.combined_macro_f1 -le $CurrentFullCombined)) {
   Write-Host "[skip] full scale skipped because 50pct combined=$($bestScaleRow.combined_macro_f1) <= current full baseline=$CurrentFullCombined"
 } elseif (-not $SkipFull) {
-  Run-Experiment -Name "outputs_v2_full_best" -Fraction 1.0 -FeatureProfile $bestFeature -ModelArchitecture $bestArch -CalibrateThreshold
+  Run-Experiment -Name "outputs_v2_full_best" -Fraction 1.0 -FeatureProfile $bestFeature -ModelArchitecture $scaleArch -CalibrateThreshold
   Build-V2Assets
 } else {
   Write-Host "[skip] full scale skipped by -SkipFull"
 }
 
 Write-Host "[phase5] mild training augmentation probe"
-Run-Experiment -Name "outputs_v2_20pct_best_mild_aug" -Fraction 0.20 -FeatureProfile $bestFeature -ModelArchitecture $bestArch -TrainAugmentation "mild_freq" -CalibrateThreshold
+Run-Experiment -Name "outputs_v2_20pct_best_mild_aug" -Fraction 0.20 -FeatureProfile $bestFeature -ModelArchitecture $scaleArch -TrainAugmentation "mild_freq" -CalibrateThreshold
 Build-V2Assets
 
 $augRow = Get-BestV2RowByPrefix "outputs_v2_20pct_best_mild_aug"
 $plain20 = Get-BestV2RowByPrefix "outputs_v2_20pct_best"
 if (($null -ne $augRow) -and ($null -ne $plain20) -and ([double]$augRow.combined_macro_f1 -ge ([double]$plain20.combined_macro_f1 + 0.003))) {
-  Run-Experiment -Name "outputs_v2_50pct_best_mild_aug" -Fraction 0.50 -FeatureProfile $bestFeature -ModelArchitecture $bestArch -TrainAugmentation "mild_freq" -CalibrateThreshold
+  Run-Experiment -Name "outputs_v2_50pct_best_mild_aug" -Fraction 0.50 -FeatureProfile $bestFeature -ModelArchitecture $scaleArch -TrainAugmentation "mild_freq" -CalibrateThreshold
   Build-V2Assets
   if (-not $SkipFull) {
-    Run-Experiment -Name "outputs_v2_full_best_mild_aug" -Fraction 1.0 -FeatureProfile $bestFeature -ModelArchitecture $bestArch -TrainAugmentation "mild_freq" -CalibrateThreshold
+    Run-Experiment -Name "outputs_v2_full_best_mild_aug" -Fraction 1.0 -FeatureProfile $bestFeature -ModelArchitecture $scaleArch -TrainAugmentation "mild_freq" -CalibrateThreshold
     Build-V2Assets
   }
 } else {
