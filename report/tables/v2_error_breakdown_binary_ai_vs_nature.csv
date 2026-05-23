@@ -1,0 +1,9 @@
+generator,true_label,pred_label,errors,mean_confidence
+ADM,ai,nature,1703,0.7448533270262294
+VQDM,ai,nature,822,0.6816450163279602
+ADM,nature,ai,567,0.675597897485512
+VQDM,nature,ai,536,0.6835325083763847
+BigGAN,nature,ai,509,0.6828897998863044
+glide,nature,ai,507,0.678667731136824
+glide,ai,nature,166,0.7183989572289161
+BigGAN,ai,nature,3,0.6999054891801858

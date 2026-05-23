@@ -1,0 +1,4 @@
+﻿"run","profile","binary_macro_f1","attribution_macro_f1","combined_macro_f1","delta_vs_10pct_baseline"
+"outputs_4gen_10pct_enhanced_wide","wide","0.901439130219425","0.890169302139298","0.895804216179361","0.00334901078633931"
+"outputs_4gen_10pct_enhanced_large","large","0.896223983929304","0.887562083703084","0.891893033816194","-0.000562171576828141"
+"outputs_4gen_10pct_enhanced_regularized","regularized","0.89684845549013","0.886348139027478","0.891598297258804","-0.000856908134218237"

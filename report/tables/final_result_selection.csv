@@ -1,0 +1,8 @@
+run,feature_profile,lgbm_profile,sample_fraction,stage,binary_accuracy,binary_macro_f1,binary_auc,attribution_accuracy,attribution_macro_f1,combined_macro_f1,valid_against_floor,selected,selection_status
+outputs_4gen_full_best,baseline,wide,1.0,full_best,0.8997291666666667,0.899714775693452,0.9639623645833332,0.9087916666666668,0.9085996400582268,0.9041572078758394,True,True,selected_best
+outputs_4gen_50pct_best,baseline,wide,0.5,50pct_best,0.89925,0.8992366740501432,0.9634945416666666,0.9045833333333332,0.9042502268230116,0.9017434504365773,True,False,not_selected
+outputs_4gen_20pct_best,baseline,wide,0.2,20pct_best,0.8980208333333334,0.8979962610133545,0.9633293836805557,0.903125,0.902671231044436,0.9003337460288953,True,False,not_selected
+outputs_4gen_10pct_enhanced_wide,enhanced,wide,0.1,10pct_enhanced_tuning,0.9014583333333334,0.9014391302194252,0.9638649305555556,0.8904166666666666,0.8901693021392978,0.8958042161793616,True,False,not_selected
+outputs_4gen_10pct_best,baseline,wide,0.1,10pct_best,0.895625,0.8956021584410027,0.9620213541666668,0.8895833333333333,0.8893082523450415,0.8924552053930221,True,False,not_selected
+outputs_4gen_10pct_enhanced_large,enhanced,large,0.1,10pct_enhanced_tuning,0.89625,0.8962239839293045,0.9614557291666666,0.8879166666666667,0.8875620837030835,0.891893033816194,True,False,not_selected
+outputs_4gen_10pct_enhanced_regularized,enhanced,regularized,0.1,10pct_enhanced_tuning,0.896875,0.8968484554901303,0.962092534722222,0.8866666666666667,0.8863481390274777,0.8915982972588039,True,False,not_selected

@@ -1,0 +1,163 @@
+% !TeX program = xelatex
+% !TeX encoding = UTF-8
+\documentclass[sigconf,nonacm]{acmart}
+
+\usepackage{xeCJK}
+\setCJKmainfont{SimSun}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath}
+
+\AtBeginDocument{%
+  \providecommand\BibTeX{{Bib\TeX}}%
+}
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+\title{AIGC 图像的频谱指纹挖掘与伪造检测}
+\author{Team members: [fill in]}
+\affiliation{%
+  \institution{[fill in]}
+  \city{[fill in]}
+  \country{China}
+}
+\email{[fill in]}
+
+\begin{document}
+\begin{abstract}
+本文面向课程第五题，研究 AIGC 图像在频率域中的可检测指纹。我们基于 GenImage 的 ADM、BigGAN、VQDM 和 GLIDE 四个生成源构建两个任务：AI/真实图像二分类，以及 AI 图像的生成源归因。方法不引入 CNN 或 Vision Transformer，而是提取 FFT、DCT、颜色频谱、多尺度频谱、块 DCT 与残差频谱统计，并使用 LightGBM 完成浅层可解释建模。最终最佳路线为 \texttt{fusion\_freq + flat LightGBM + wide profile}，在 full 训练比例下达到二分类 macro-F1 0.9913、AUC 0.9996，归因 macro-F1 0.9991，双任务平均 macro-F1 0.9952。进一步的 20\% degraded validation 表明，该模型在 clean 数据上极强，但在 JPEG、resize 和 Gaussian noise 下明显退化；旧灰度 baseline clean 分数较低，却在部分 JPEG/noise 场景更稳。结果说明频谱指纹能有效检测 AIGC 图像，同时也暴露出高频和颜色频谱特征对后处理扰动的脆弱性。
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+扩散模型和 GAN 生成图像的视觉质量持续提升，单靠肉眼已经难以判断图像来源。课程项目第五题关注 AIGC 图像的数据生成机制与伪造检测，因此本文不把重点放在语义识别，而是挖掘生成过程可能残留在频率域中的统计痕迹。上采样、去噪、压缩链路和生成器结构都可能改变功率谱分布、方向性能量、高频残差和局部频率变化，这些模式为轻量检测提供了可解释依据。
+
+本文围绕三个研究问题展开：RQ1，频谱统计能否区分 AI 图像与真实图像；RQ2，频谱特征能否识别生成源；RQ3，JPEG、缩放和噪声扰动会怎样破坏或保留频谱指纹。贡献包括：构建 GenImage 四生成源频域检测流程；比较并调优浅层模型；提出颜色、多尺度、块 DCT 和残差频谱融合特征；补充 clean performance、scale-up、鲁棒性诊断、错误分析和特征重要性解释。
+
+\section{Dataset and Protocol}
+本文使用 GenImage 数据集~\cite{zhu2023genimage} 中的四个生成源子集：ADM、BigGAN、VQDM 和 GLIDE。数据根目录为 \texttt{C:\textbackslash Users\textbackslash 99303\textbackslash git\textbackslash GenImage\_data}，每个生成源均包含 \texttt{train/ai}、\texttt{train/nature}、\texttt{val/ai} 和 \texttt{val/nature}。实验中 \texttt{train} 用于训练，\texttt{val} 作为测试集。
+
+二分类任务合并四个生成源下的 AI 与 nature 图像，标签为 \texttt{ai} 和 \texttt{nature}。归因任务只使用 AI 图像，标签为 ADM、BigGAN、VQDM 和 GLIDE。所有抽样实验均使用分层采样和固定 seed；最终主结果使用 full 训练比例，鲁棒性诊断使用同一模型在 20\% validation 子集上评估。
+
+\begin{table}[t]
+  \centering
+  \caption{GenImage 四个生成源的本地数据规模。}
+  \label{tab:dataset-counts}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Generator & Train AI & Train Nature & Val AI & Val Nature \\
+    \midrule
+    ADM & 162000 & 157453 & 6000 & 6000 \\
+    BigGAN & 162000 & 162000 & 6000 & 6000 \\
+    VQDM & 162000 & 162000 & 6000 & 6000 \\
+    GLIDE & 162000 & 162000 & 6000 & 6000 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Method}
+基础特征首先将图像 resize 到 $256\times256$，对灰度图去均值并施加 Hann 窗，然后计算二维 FFT 功率谱：
+\[
+P(u,v)=\log(1+|\mathcal{F}(I)(u,v)|^2).
+\]
+baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量比例、频谱斜率、高频残差统计、patch 级高频变化和 DCT 径向谱。为了进一步提分，本文增加 \texttt{fusion\_freq} profile：在 RGB 与 YCbCr 通道上提取颜色频谱；在 128、256 和 384 三个尺度上提取多尺度频谱；加入 8x8 block-DCT AC 能量和块边界统计；并对高通、median 与 Laplacian 残差再做频谱统计。这些特征仍对应明确的信号处理统计，不依赖语义表示。
+
+监督模型以 LightGBM~\cite{ke2017lightgbm} 为主，RandomForest 和 LogisticRegression 作为早期 baseline。最终路线使用 flat LightGBM 多分类结构、\texttt{wide} profile 和阈值校准。LightGBM 训练优先使用 GPU；若 GPU 在多分类训练中报错，代码自动 fallback 到 CPU。频谱特征提取主要依赖 CPU 多进程和 feature cache。信号处理背景参考 Oppenheim 等人的经典教材~\cite{oppenheim1999discrete}。
+
+\section{Experiments}
+实验分为四层推进。第一层用 1\%、5\% 和 10\% 抽样验证原始 FFT/DCT baseline，并完成 LightGBM profile 调参。第二层进行 full scale-up，确认样本量扩大能稳定提升 clean performance。第三层做频域优先提分，比较 \texttt{color\_freq}、\texttt{multiscale\_freq}、\texttt{block\_dct}、\texttt{residual\_freq} 和 \texttt{fusion\_freq}，并尝试 hierarchical、pairwise OVO 和 binary expert ensemble。第四层固定最终最佳模型，不重新训练，只在 validation 图像上施加 JPEG、resize 和 Gaussian noise，诊断模型对真实后处理扰动的脆弱性。
+
+所有主要结果通过 \texttt{metrics\_summary.json}、\texttt{model\_comparison.csv}、混淆矩阵、feature importance 和 robustness CSV 自动汇总到 \texttt{report/tables} 与 \texttt{report/figures}。Notebook 只读取这些资产，不重新执行大规模训练。
+
+\section{Results and Analysis}
+\subsection{Clean Performance}
+表~\ref{tab:main-results} 汇总了从旧灰度 baseline 到第二轮频域融合优化的关键结果。第一轮 full baseline 的双任务平均 macro-F1 为 0.9042；引入 \texttt{fusion\_freq} 后，5\% 抽样已经达到 0.9919，full 训练比例进一步达到 0.9952。队友补充的 20\% seed 123 实验也达到 0.9931，说明该提升不是单个 seed 的偶然现象。
+
+\begin{table}[t]
+  \centering
+  \caption{主要 clean 结果对比。}
+  \label{tab:main-results}
+  \begin{tabular}{llrrr}
+    \toprule
+    Run & Feature & Binary F1 & Attr. F1 & Avg. F1 \\
+    \midrule
+    旧 full baseline & gray FFT/DCT & 0.8997 & 0.9086 & 0.9042 \\
+    v2 5\% flat & fusion & 0.9871 & 0.9967 & 0.9919 \\
+    v2 20\% flat & fusion & 0.9910 & 0.9973 & 0.9942 \\
+    v2 20\% seed123 & fusion & 0.9892 & 0.9971 & 0.9931 \\
+    v2 full best & fusion & \textbf{0.9913} & \textbf{0.9991} & \textbf{0.9952} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure*}[t]
+  \centering
+  \IfFileExists{figures/optimization_v2_macro_f1.png}{\includegraphics[width=0.49\textwidth]{figures/optimization_v2_macro_f1.png}}{\fbox{\parbox{0.45\textwidth}{v2 优化结果图待生成。}}}
+  \IfFileExists{figures/scaleup_macro_f1.png}{\includegraphics[width=0.49\textwidth]{figures/scaleup_macro_f1.png}}{\fbox{\parbox{0.45\textwidth}{scale-up 结果图待生成。}}}
+  \caption{第二轮频域优化和抽样比例扩大带来的 clean performance 提升。}
+  \label{fig:optimization-scale}
+\end{figure*}
+
+\subsection{Confusion Matrix and Feature Importance}
+最终 full 模型在 48000 张二分类 validation 图像上只误判 420 张；在 24000 张 AI attribution validation 图像上只误判 22 张。归因任务中 ADM、BigGAN、VQDM 和 GLIDE 基本都能被稳定区分，说明颜色频谱、多尺度频谱和残差频谱对生成源差异尤其敏感。
+
+\begin{figure}[t]
+  \centering
+  \IfFileExists{figures/confusion_ai_subsource_attribution_lightgbm.png}{\includegraphics[width=\linewidth]{figures/confusion_ai_subsource_attribution_lightgbm.png}}{\fbox{\parbox{0.92\linewidth}{归因混淆矩阵待生成。}}}
+  \caption{最终 full 模型在生成源归因任务上的混淆矩阵。}
+  \label{fig:confusion-attribution}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \IfFileExists{figures/feature_importance_binary_ai_vs_nature_top20.png}{\includegraphics[width=\linewidth]{figures/feature_importance_binary_ai_vs_nature_top20.png}}{\fbox{\parbox{0.92\linewidth}{特征重要性图待生成。}}}
+  \caption{二分类任务中的 Top-20 频域特征重要性。}
+  \label{fig:feature-importance}
+\end{figure}
+
+\subsection{Robustness Diagnosis}
+鲁棒性实验不重新训练模型，而是直接加载 \texttt{outputs\_v2\_full\_best} 的最佳模型，对同一 20\% validation 子集施加扰动。表~\ref{tab:robustness} 显示，\texttt{fusion\_freq} 模型在 clean 子集上接近满分，但 JPEG、resize 和 Gaussian noise 会显著改变高频与颜色频谱统计，从而造成预测分布偏移。例如二分类在 JPEG 95 下从 0.9908 降到 0.6607，在 resize 0.5 下降到 0.3671，在 noise 10 下降到 0.3377；归因任务对 degraded 图像更加敏感。
+
+\begin{table}[t]
+  \centering
+  \caption{20\% validation 上的鲁棒性诊断 macro-F1。}
+  \label{tab:robustness}
+  \begin{tabular}{lrrr}
+    \toprule
+    Setting & Binary & Attribution & Note \\
+    \midrule
+    clean & 0.9908 & 0.9992 & 无扰动 \\
+    JPEG 95 & 0.6607 & 0.2952 & 轻压缩 \\
+    JPEG 50 & 0.5666 & 0.2526 & 强压缩 \\
+    resize 0.5 & 0.3671 & 0.1551 & 下采样 \\
+    resize 1.5 & 0.8136 & 0.6282 & 上采样 \\
+    noise 2 & 0.7481 & 0.1887 & 轻噪声 \\
+    noise 10 & 0.3377 & 0.1000 & 强噪声 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure*}[t]
+  \centering
+  \IfFileExists{figures/robustness_comparison_binary_ai_vs_nature.png}{\includegraphics[width=0.49\textwidth]{figures/robustness_comparison_binary_ai_vs_nature.png}}{\fbox{\parbox{0.45\textwidth}{二分类鲁棒性对照图待生成。}}}
+  \IfFileExists{figures/robustness_comparison_ai_subsource_attribution.png}{\includegraphics[width=0.49\textwidth]{figures/robustness_comparison_ai_subsource_attribution.png}}{\fbox{\parbox{0.45\textwidth}{归因鲁棒性对照图待生成。}}}
+  \caption{当前 \texttt{fusion\_freq} 最佳模型与旧灰度 baseline 的 degraded validation 对照。}
+  \label{fig:robustness-comparison}
+\end{figure*}
+
+旧灰度 baseline 的 clean 二分类 macro-F1 只有 0.8942，但在 JPEG 95 和 noise 2 下分别保持 0.8686 和 0.8460，高于 \texttt{fusion\_freq} 的 0.6607 和 0.7481。这一对照说明：频域融合特征显著提升 clean 判别力，但也更依赖易被后处理破坏的细粒度频谱指纹。本文因此不声称鲁棒性已经解决，而是将 degraded evaluation 作为失效模式分析。
+
+\section{Discussion}
+实验结果显示，AIGC 图像与真实图像在频率域中存在强可分模式。尤其是颜色频谱、多尺度功率谱和残差频谱，使浅层模型在四生成源 clean validation 上接近饱和。由于模型特征具有明确物理含义，特征重要性、混淆矩阵和频谱示例可以解释模型关注的频段和通道。
+
+主要局限也很明确。第一，本文只使用 GenImage 四个生成源，不声明完整 GenImage benchmark。第二，模型是浅层频域检测器，不与大规模深度检测器争夺 SOTA。第三，鲁棒性结果表明，强 JPEG、缩放和噪声会破坏当前最有效的高频/颜色指纹；如果后续目标是部署到真实社交媒体图像，应进一步研究训练时扰动增强、测试时增强或更稳健的低频/中频特征融合。
+
+\section{Conclusion}
+本文将 AIGC 图像检测转化为可解释的频域统计挖掘问题。最终 \texttt{fusion\_freq} full 模型在 clean validation 上达到二分类 macro-F1 0.9913 和归因 macro-F1 0.9991，显著超过早期灰度 FFT/DCT baseline。鲁棒性诊断进一步指出，clean 性能和 degraded 稳定性之间存在明显权衡：频谱融合特征可以大幅提升检测能力，但对后处理扰动敏感。该结论为课程项目提供了完整的检测、归因、解释和失效分析闭环。
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\end{document}
