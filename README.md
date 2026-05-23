@@ -120,6 +120,18 @@ Build report assets:
   --robustness-compare-outputs outputs_v2_full_best_robust_20pct outputs_4gen_full_best_robust_20pct
 ```
 
+Validate the final submission loop:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\validate_submission.py `
+  --dataset-root C:\Users\99303\git\GenImage_data `
+  --write-report
+```
+
+This checks data structure, final metrics, robustness CSVs, report assets,
+Notebook JSON, PDF page count, and Git hygiene. The generated checklist is
+written to `report/submission_checklist.md`.
+
 ## Outputs
 
 Each experiment output contains:
