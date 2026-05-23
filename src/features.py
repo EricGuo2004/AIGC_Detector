@@ -65,11 +65,12 @@ def load_feature_image(path: str, cfg: FeatureConfig) -> np.ndarray:
 
 
 def apply_jpeg_compression(image: np.ndarray, quality: int) -> np.ndarray:
-    pil_img = Image.fromarray(np.clip(image, 0, 255).astype(np.uint8))
+    mode = "RGB" if image.ndim == 3 else "L"
+    pil_img = Image.fromarray(np.clip(image, 0, 255).astype(np.uint8), mode=mode)
     buffer = BytesIO()
     pil_img.save(buffer, format="JPEG", quality=quality)
     buffer.seek(0)
-    return np.asarray(Image.open(buffer).convert("L"), dtype=np.float32)
+    return np.asarray(Image.open(buffer).convert(mode), dtype=np.float32)
 
 
 def apply_resize_attack(image: np.ndarray, scale: float) -> np.ndarray:

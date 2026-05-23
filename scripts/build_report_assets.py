@@ -36,6 +36,17 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="Primary output directory for confusion matrices and feature-importance plots.",
     )
+    parser.add_argument(
+        "--robustness-output",
+        default="",
+        help="Optional output directory containing robustness_results.csv files. Defaults to the largest robustness run.",
+    )
+    parser.add_argument(
+        "--robustness-compare-outputs",
+        nargs="*",
+        default=[],
+        help="Optional robustness output directories to compare in a separate CSV/PNG.",
+    )
     return parser.parse_args()
 
 
@@ -454,7 +465,12 @@ def save_robustness_plot(task_dir: Path, task: str, figure_dir: Path, table_dir:
         return
     df.to_csv(table_dir / f"robustness_{task}.csv", index=False)
     fig, ax = plt.subplots(figsize=(6.4, 4.2))
-    for attack, group in df.groupby("attack"):
+    clean = df[df["attack"] == "clean"]
+    if not clean.empty:
+        clean_f1 = float(clean.iloc[0]["macro_f1"])
+        ax.axhline(clean_f1, color="#555555", linestyle="--", linewidth=1.1, label=f"clean ({clean_f1:.3f})")
+    plot_df = df[df["attack"] != "clean"].copy()
+    for attack, group in plot_df.groupby("attack"):
         ax.plot(group["level"].astype(str), group["macro_f1"], marker="o", label=attack)
     ax.set_ylim(0, 1.05)
     ax.set_xlabel("Attack level")
@@ -464,6 +480,84 @@ def save_robustness_plot(task_dir: Path, task: str, figure_dir: Path, table_dir:
     plt.tight_layout()
     plt.savefig(figure_dir / f"robustness_{task}.png", dpi=220)
     plt.close()
+
+
+def has_robustness_results(output_dir: Path) -> bool:
+    return any((output_dir / task / "robustness_results.csv").exists() for task in TASKS)
+
+
+def robustness_fraction(output_dir: Path) -> float:
+    cfg_path = output_dir / "run_config.json"
+    if not cfg_path.exists():
+        return 0.0
+    try:
+        return float(read_json(cfg_path).get("sample_fraction", 0.0))
+    except Exception:
+        return 0.0
+
+
+def select_robustness_output(outputs: List[Path], override: str) -> Path | None:
+    if override:
+        path = Path(override)
+        if not path.exists():
+            raise SystemExit(f"Robustness output does not exist: {path}")
+        return path if has_robustness_results(path) else None
+
+    candidates = [p for p in outputs if has_robustness_results(p)]
+    if not candidates:
+        return None
+    return sorted(
+        candidates,
+        key=lambda p: (
+            robustness_fraction(p),
+            1 if "full" in p.name else 0,
+            0 if "smoke" in p.name else 1,
+            p.stat().st_mtime,
+        ),
+        reverse=True,
+    )[0]
+
+
+def collect_robustness_comparison(output_dirs: List[Path]) -> pd.DataFrame:
+    rows = []
+    for out_dir in output_dirs:
+        if not out_dir.exists():
+            continue
+        for task in TASKS:
+            path = out_dir / task / "robustness_results.csv"
+            if not path.exists():
+                continue
+            df = pd.read_csv(path)
+            for row in df.to_dict(orient="records"):
+                rows.append({"run": out_dir.name, "task": task, **row})
+    return pd.DataFrame(rows)
+
+
+def save_robustness_comparison(df: pd.DataFrame, figure_dir: Path, table_dir: Path) -> None:
+    if df.empty:
+        return
+    df.to_csv(table_dir / "robustness_comparison.csv", index=False)
+    for task, group in df.groupby("task"):
+        plot_df = group.copy()
+        plot_df["condition"] = plot_df["attack"].astype(str) + "=" + plot_df["level"].astype(str)
+        order = (
+            ["clean=none"]
+            + [f"jpeg={x}" for x in ("95", "75", "50")]
+            + [f"resize={x}" for x in ("0.5", "0.75", "1.5")]
+            + [f"noise={x}" for x in ("2", "5", "10")]
+        )
+        plot_df["condition"] = pd.Categorical(plot_df["condition"], categories=order, ordered=True)
+        pivot = plot_df.pivot_table(index="condition", columns="run", values="macro_f1", aggfunc="first")
+        pivot = pivot.dropna(how="all")
+        ax = pivot.plot(kind="bar", figsize=(9.0, 4.8), rot=35)
+        ax.set_ylim(0, 1.05)
+        ax.set_xlabel("Condition")
+        ax.set_ylabel("Macro-F1")
+        ax.set_title(f"Robustness comparison: {task}")
+        ax.legend(title="Run", loc="lower left")
+        plt.tight_layout()
+        plt.savefig(figure_dir / f"robustness_comparison_{task}.png", dpi=220)
+        plt.close()
 
 
 def fft_power(path: Path, size: int = 256) -> np.ndarray:
@@ -498,11 +592,18 @@ def save_spectrum_examples(dataset_root: Path, figure_dir: Path) -> None:
     plt.close()
 
 
-def write_manifest(report_dir: Path, outputs: List[Path], primary: Path, dataset_counts: pd.DataFrame) -> None:
+def write_manifest(
+    report_dir: Path,
+    outputs: List[Path],
+    primary: Path,
+    dataset_counts: pd.DataFrame,
+    robustness_primary: Path | None = None,
+) -> None:
     lines = [
         "# Report Asset Manifest",
         "",
         f"- Primary output: `{primary}`",
+        f"- Robustness output: `{robustness_primary}`" if robustness_primary else "- Robustness output: none",
         f"- Output directories: {', '.join(f'`{p}`' for p in outputs)}",
         f"- Dataset rows: {len(dataset_counts)}",
         "",
@@ -526,6 +627,8 @@ def main() -> None:
     primary = Path(args.primary_output) if args.primary_output else outputs[-1]
     if not primary.exists():
         raise SystemExit(f"Primary output does not exist: {primary}")
+    robustness_primary = select_robustness_output(outputs, args.robustness_output)
+    robustness_compare_outputs = [Path(p) for p in args.robustness_compare_outputs]
 
     dataset_counts = count_dataset(dataset_root)
     dataset_counts.to_csv(table_dir / "dataset_counts.csv", index=False)
@@ -556,10 +659,17 @@ def main() -> None:
         task_dir = primary / task
         save_confusion_plot(task_dir, task, figure_dir)
         save_feature_importance_plot(task_dir, task, figure_dir, table_dir)
-        save_robustness_plot(task_dir, task, figure_dir, table_dir)
+        robust_task_dir = (robustness_primary / task) if robustness_primary else task_dir
+        save_robustness_plot(robust_task_dir, task, figure_dir, table_dir)
+    if robustness_compare_outputs:
+        save_robustness_comparison(
+            collect_robustness_comparison(robustness_compare_outputs),
+            figure_dir,
+            table_dir,
+        )
 
     save_spectrum_examples(dataset_root, figure_dir)
-    write_manifest(report_dir, outputs, primary, dataset_counts)
+    write_manifest(report_dir, outputs, primary, dataset_counts, robustness_primary)
 
     print(f"Wrote report assets to {report_dir.resolve()}")
 
