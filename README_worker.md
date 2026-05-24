@@ -160,7 +160,9 @@ Older example:
 
 ## 5. Return results
 
-After the command finishes, send back only the assigned `outputs_v2_*` directory.
+After the command finishes, send back only the assigned output directories, for
+example `outputs_worker_stable_freq_20pct` and
+`outputs_worker_stable_freq_20pct_robust_20pct`.
 Do not send back:
 
 ```text
