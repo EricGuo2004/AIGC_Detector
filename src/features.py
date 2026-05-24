@@ -28,6 +28,7 @@ FEATURE_PROFILE_CHOICES = (
     "multiscale_freq",
     "block_dct",
     "residual_freq",
+    "stable_freq",
     "fusion_freq",
 )
 
@@ -364,6 +365,44 @@ def _enhanced_from_gray(gray: np.ndarray, cfg: FeatureConfig) -> np.ndarray:
     return _enhanced_frequency_features(radial, power)
 
 
+def _stable_radial_bins(cfg: FeatureConfig) -> int:
+    return max(8, int(round(cfg.radial_bins * 0.75)))
+
+
+def _stable_dct_bins(cfg: FeatureConfig) -> int:
+    return max(8, int(round(max(16, cfg.radial_bins // 2) * 0.75)))
+
+
+def _smooth_vector(values: np.ndarray, window: int = 5) -> np.ndarray:
+    if values.size == 0:
+        return values
+    window = max(1, min(window, values.size))
+    kernel = np.ones(window, dtype=np.float64) / float(window)
+    return np.convolve(values.astype(np.float64), kernel, mode="same").astype(np.float32)
+
+
+def _stable_frequency_features(gray: np.ndarray, cfg: FeatureConfig) -> np.ndarray:
+    image, power = _windowed_power(gray)
+    radial = _radial_profile(power, cfg.radial_bins)
+    radial_norm = radial / (float(radial.sum()) + 1e-8)
+    stable_bins = _stable_radial_bins(cfg)
+    dct_bins = _stable_dct_bins(cfg)
+    dct_radial = _dct_radial_profile(image, bins=max(16, cfg.radial_bins // 2))
+    feats = np.concatenate(
+        [
+            radial_norm[:stable_bins],
+            _smooth_vector(radial_norm, window=5)[:stable_bins],
+            _multi_band_energy(radial, bands=6),
+            _spectral_shape_stats(radial),
+            _radial_diff_stats(_smooth_vector(radial_norm, window=5)),
+            _spectral_slope(radial),
+            _tail_energy_ratios(radial),
+            dct_radial[:dct_bins],
+        ]
+    )
+    return np.nan_to_num(feats.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+
+
 def _rgb_ycbcr_channels(image: np.ndarray) -> Dict[str, np.ndarray]:
     rgb = _as_rgb(image)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
@@ -568,11 +607,30 @@ def _residual_feature_names(cfg: FeatureConfig) -> List[str]:
     return names
 
 
+def _stable_feature_names(cfg: FeatureConfig) -> List[str]:
+    stable_bins = _stable_radial_bins(cfg)
+    dct_bins = _stable_dct_bins(cfg)
+    names: List[str] = []
+    names += [f"stable_radial_norm_{i}" for i in range(stable_bins)]
+    names += [f"stable_radial_smooth_{i}" for i in range(stable_bins)]
+    names += [f"stable_six_band_energy_{i}" for i in range(6)]
+    names += ["stable_spectral_centroid", "stable_spectral_spread", "stable_spectral_entropy"]
+    names += ["stable_radial_diff_mean", "stable_radial_diff_std", "stable_radial_diff_min", "stable_radial_diff_max"]
+    names += ["stable_spectral_slope", "stable_spectral_intercept"]
+    names += ["stable_tail_to_low_energy", "stable_tail_to_mid_energy", "stable_high_to_low_mid_energy"]
+    names += [f"stable_dct_radial_low_mid_{i}" for i in range(dct_bins)]
+    return names
+
+
 def extract_feature_vector(image: np.ndarray, cfg: FeatureConfig) -> np.ndarray:
     if cfg.feature_profile not in FEATURE_PROFILE_CHOICES:
         raise ValueError(f"Unknown feature profile '{cfg.feature_profile}'. Expected one of: {', '.join(FEATURE_PROFILE_CHOICES)}")
 
     gray = _as_gray(image)
+    if cfg.feature_profile == "stable_freq":
+        feats = _stable_frequency_features(gray, cfg).astype(np.float32)
+        return np.nan_to_num(feats, nan=0.0, posinf=0.0, neginf=0.0)
+
     parts = [_base_frequency_features(gray, cfg)]
     if cfg.feature_profile == "enhanced":
         parts.append(_enhanced_from_gray(gray, cfg))
@@ -584,6 +642,8 @@ def extract_feature_vector(image: np.ndarray, cfg: FeatureConfig) -> np.ndarray:
         parts.append(_block_dct_features(image, cfg))
     elif cfg.feature_profile == "residual_freq":
         parts.append(_residual_frequency_features(image, cfg))
+    elif cfg.feature_profile == "stable_freq":
+        parts.append(_stable_frequency_features(gray, cfg))
     elif cfg.feature_profile == "fusion_freq":
         parts.extend(
             [
@@ -623,6 +683,9 @@ def make_feature_names(cfg: FeatureConfig) -> List[str]:
     if cfg.feature_profile not in FEATURE_PROFILE_CHOICES:
         raise ValueError(f"Unknown feature profile '{cfg.feature_profile}'. Expected one of: {', '.join(FEATURE_PROFILE_CHOICES)}")
 
+    if cfg.feature_profile == "stable_freq":
+        return _stable_feature_names(cfg)
+
     names = _base_feature_names(cfg)
     if cfg.feature_profile == "enhanced":
         names += _enhanced_feature_names()
@@ -634,6 +697,8 @@ def make_feature_names(cfg: FeatureConfig) -> List[str]:
         names += _block_dct_feature_names()
     elif cfg.feature_profile == "residual_freq":
         names += _residual_feature_names(cfg)
+    elif cfg.feature_profile == "stable_freq":
+        names += _stable_feature_names(cfg)
     elif cfg.feature_profile == "fusion_freq":
         names += _color_feature_names(cfg)
         names += _multiscale_feature_names(cfg)
@@ -643,6 +708,23 @@ def make_feature_names(cfg: FeatureConfig) -> List[str]:
 
 
 def feature_group_indices(cfg: FeatureConfig) -> Dict[str, np.ndarray]:
+    if cfg.feature_profile == "stable_freq":
+        names = make_feature_names(cfg)
+        all_indices = np.arange(len(names))
+        dct_start = len(names) - _stable_dct_bins(cfg)
+        groups: Dict[str, np.ndarray] = {
+            "all": all_indices,
+            "fft_radial": np.arange(0, _stable_radial_bins(cfg)),
+            "fft_angular": all_indices,
+            "band_slope": np.arange(_stable_radial_bins(cfg) * 2, _stable_radial_bins(cfg) * 2 + 11),
+            "high_freq_stats": all_indices,
+            "patch_high_freq": all_indices,
+            "high_freq_all": all_indices,
+            "dct_radial": np.arange(dct_start, len(names)),
+        }
+        groups["no_dct"] = np.setdiff1d(all_indices, groups["dct_radial"], assume_unique=True)
+        return groups
+
     dct_bins = max(16, cfg.radial_bins // 2)
     start = 0
     groups: Dict[str, np.ndarray] = {}

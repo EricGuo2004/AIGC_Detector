@@ -120,6 +120,55 @@ Build report assets:
   --robustness-compare-outputs outputs_v2_full_best_robust_20pct outputs_4gen_full_best_robust_20pct
 ```
 
+## 4-Generator Extension Experiments
+
+The clean 4-generator result is already close to saturated, so the extension
+track focuses on generalization, robustness, and confidence diagnostics while
+keeping the same ADM, BigGAN, VQDM, and GLIDE data.
+
+Run the extension suite at 20% sampling:
+
+```powershell
+.\scripts\run_4gen_extension_suite.ps1 `
+  -DatasetRoot C:\Users\99303\git\GenImage_data `
+  -LightgbmDevice gpu `
+  -LogoFraction 0.20 `
+  -CandidateFraction 0.20
+```
+
+The suite runs:
+
+- leave-one-generator-out binary generalization;
+- `stable_freq` clean comparison;
+- `fusion_freq` mild/robust training augmentation;
+- 20% JPEG / resize / noise robustness for completed candidate models;
+- confidence, margin, entropy, and coverage-accuracy analysis.
+
+Individual commands are also available:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_logo_generalization.py `
+  --dataset-root C:\Users\99303\git\GenImage_data `
+  --out-dir outputs_4gen_logo_20pct_fusion `
+  --sample-fraction 0.20 `
+  --feature-profile fusion_freq `
+  --feature-cache-dir feature_cache_logo_fusion `
+  --model-set lightgbm `
+  --lightgbm-device gpu `
+  --lgbm-profile wide `
+  --calibrate-threshold `
+  --num-workers 16 `
+  --feature-chunksize 64 `
+  --resume-completed
+
+.\.venv\Scripts\python.exe scripts\analyze_confidence_rejection.py `
+  --dataset-root C:\Users\99303\git\GenImage_data `
+  --output-dir outputs_v2_full_best `
+  --tasks both `
+  --sample-fraction 1.0 `
+  --feature-cache-dir feature_cache_fusion
+```
+
 Validate the final submission loop:
 
 ```powershell

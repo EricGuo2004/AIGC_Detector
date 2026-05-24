@@ -52,7 +52,90 @@ val\nature
 
 ## 4. Run an assigned experiment
 
-Use a unique `--out-dir` for each machine. Example:
+Use a unique `--out-dir` for each machine. For the current 4-generator
+extension stage, do not repeat `outputs_4gen_20pct_fusion_robust_aug`; the main
+machine is already running it. The most useful worker jobs are below.
+
+Set the data path first:
+
+```powershell
+$DATA = "D:\AIGC_Worker\GenImage_data"
+```
+
+### Worker A: stable_freq clean + robustness
+
+```powershell
+.\.venv\Scripts\python.exe test.py `
+  --dataset-root $DATA `
+  --out-dir outputs_worker_stable_freq_20pct `
+  --sample-fraction 0.20 `
+  --sample-seed 42 `
+  --skip-robustness `
+  --lightgbm-device cpu `
+  --num-workers 12 `
+  --feature-chunksize 64 `
+  --feature-cache-dir feature_cache_stable `
+  --sample-cache-dir sample_cache `
+  --feature-set all `
+  --feature-profile stable_freq `
+  --lgbm-profile wide `
+  --model-set lightgbm `
+  --model-architecture flat `
+  --train-augmentation none `
+  --calibrate-threshold `
+  --resume-completed-tasks
+
+.\.venv\Scripts\python.exe scripts\evaluate_best_robustness.py `
+  --dataset-root $DATA `
+  --model-output outputs_worker_stable_freq_20pct `
+  --out-dir outputs_worker_stable_freq_20pct_robust_20pct `
+  --sample-fraction 0.20 `
+  --sample-seed 42 `
+  --tasks both `
+  --num-workers 12 `
+  --feature-chunksize 64 `
+  --robust-cache-dir robustness_cache_stable
+```
+
+### Worker B: mild_aug clean + robustness
+
+```powershell
+.\.venv\Scripts\python.exe test.py `
+  --dataset-root $DATA `
+  --out-dir outputs_worker_fusion_mild_aug_20pct `
+  --sample-fraction 0.20 `
+  --sample-seed 42 `
+  --skip-robustness `
+  --lightgbm-device cpu `
+  --num-workers 12 `
+  --feature-chunksize 64 `
+  --feature-cache-dir feature_cache_fusion `
+  --sample-cache-dir sample_cache `
+  --feature-set all `
+  --feature-profile fusion_freq `
+  --lgbm-profile wide `
+  --model-set lightgbm `
+  --model-architecture flat `
+  --train-augmentation mild_freq `
+  --calibrate-threshold `
+  --resume-completed-tasks
+
+.\.venv\Scripts\python.exe scripts\evaluate_best_robustness.py `
+  --dataset-root $DATA `
+  --model-output outputs_worker_fusion_mild_aug_20pct `
+  --out-dir outputs_worker_fusion_mild_aug_20pct_robust_20pct `
+  --sample-fraction 0.20 `
+  --sample-seed 42 `
+  --tasks both `
+  --num-workers 12 `
+  --feature-chunksize 64 `
+  --robust-cache-dir robustness_cache_fusion
+```
+
+If the machine has a working LightGBM GPU setup, `--lightgbm-device cpu` can be
+changed to `--lightgbm-device gpu`. CPU mode is the safest default.
+
+Older example:
 
 ```powershell
 .\.venv\Scripts\python.exe test.py `
@@ -74,9 +157,6 @@ Use a unique `--out-dir` for each machine. Example:
   --train-augmentation none `
   --calibrate-threshold
 ```
-
-If the machine has a working LightGBM GPU setup, `--lightgbm-device cpu` can be
-changed to `--lightgbm-device gpu`. CPU mode is the safest default.
 
 ## 5. Return results
 

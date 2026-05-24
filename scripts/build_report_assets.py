@@ -77,7 +77,12 @@ def count_dataset(dataset_root: Path) -> pd.DataFrame:
         for rel in ["train/ai", "train/nature", "val/ai", "val/nature"]:
             row[rel.replace("/", "_")] = count_images(gen_dir / rel)
         rows.append(row)
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    if not df.empty and "run" in df:
+        non_smoke = ~df["run"].astype(str).str.contains("smoke", case=False, na=False)
+        if non_smoke.any():
+            df = df[non_smoke].copy()
+    return df
 
 
 def discover_outputs(paths: Iterable[str]) -> List[Path]:
@@ -537,6 +542,7 @@ def save_robustness_comparison(df: pd.DataFrame, figure_dir: Path, table_dir: Pa
     if df.empty:
         return
     df.to_csv(table_dir / "robustness_comparison.csv", index=False)
+    save_robustness_tradeoff(df, figure_dir, table_dir)
     for task, group in df.groupby("task"):
         plot_df = group.copy()
         plot_df["condition"] = plot_df["attack"].astype(str) + "=" + plot_df["level"].astype(str)
@@ -558,6 +564,137 @@ def save_robustness_comparison(df: pd.DataFrame, figure_dir: Path, table_dir: Pa
         plt.tight_layout()
         plt.savefig(figure_dir / f"robustness_comparison_{task}.png", dpi=220)
         plt.close()
+
+
+def save_robustness_tradeoff(df: pd.DataFrame, figure_dir: Path, table_dir: Path) -> None:
+    rows = []
+    for (run, task), group in df.groupby(["run", "task"]):
+        clean = group[group["attack"] == "clean"]
+        degraded = group[group["attack"] != "clean"]
+        if clean.empty or degraded.empty:
+            continue
+        rows.append(
+            {
+                "run": run,
+                "task": task,
+                "clean_macro_f1": float(clean.iloc[0]["macro_f1"]),
+                "degraded_mean_macro_f1": float(degraded["macro_f1"].mean()),
+                "degraded_min_macro_f1": float(degraded["macro_f1"].min()),
+                "clean_minus_degraded_mean": float(clean.iloc[0]["macro_f1"] - degraded["macro_f1"].mean()),
+            }
+        )
+    tradeoff = pd.DataFrame(rows)
+    if tradeoff.empty:
+        return
+    tradeoff.to_csv(table_dir / "robustness_tradeoff.csv", index=False)
+    for task, group in tradeoff.groupby("task"):
+        fig, ax = plt.subplots(figsize=(5.6, 4.4))
+        for _, row in group.iterrows():
+            ax.scatter(row["clean_macro_f1"], row["degraded_mean_macro_f1"], s=70)
+            ax.text(row["clean_macro_f1"] + 0.005, row["degraded_mean_macro_f1"], str(row["run"]), fontsize=8)
+        ax.set_xlim(0, 1.05)
+        ax.set_ylim(0, 1.05)
+        ax.set_xlabel("Clean Macro-F1")
+        ax.set_ylabel("Mean Degraded Macro-F1")
+        ax.set_title(f"Clean vs degraded tradeoff: {task}")
+        plt.tight_layout()
+        plt.savefig(figure_dir / f"robustness_tradeoff_{task}.png", dpi=220)
+        plt.close()
+
+
+def collect_logo_generalization(output_dirs: List[Path]) -> pd.DataFrame:
+    rows = []
+    for out_dir in output_dirs:
+        summary_path = out_dir / "logo_generalization_summary.csv"
+        if summary_path.exists():
+            df = pd.read_csv(summary_path)
+            for row in df.to_dict(orient="records"):
+                rows.append({"run": out_dir.name, **row})
+            continue
+        for run_dir in sorted(out_dir.glob("leave_*_out")):
+            task_dir = run_dir / "binary_ai_vs_nature"
+            metrics_path = task_dir / "metrics_summary.json"
+            comparison_path = task_dir / "model_comparison.csv"
+            if not metrics_path.exists() or not comparison_path.exists():
+                continue
+            metrics = read_json(metrics_path)
+            comparison = pd.read_csv(comparison_path)
+            best_name = metrics.get("best_model")
+            best = comparison[comparison["model"] == best_name]
+            if best.empty:
+                best = comparison.iloc[[0]]
+            record = best.iloc[0].to_dict()
+            heldout = run_dir.name.removeprefix("leave_").removesuffix("_out")
+            rows.append(
+                {
+                    "run": out_dir.name,
+                    "heldout_generator": heldout,
+                    "best_model": best_name,
+                    "accuracy": record.get("accuracy", math.nan),
+                    "macro_f1": record.get("macro_f1", math.nan),
+                    "auc": record.get("auc", math.nan),
+                    "run_dir": str(run_dir),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def save_logo_generalization(df: pd.DataFrame, figure_dir: Path, table_dir: Path) -> None:
+    if df.empty:
+        return
+    df = df.sort_values(["run", "heldout_generator"]).reset_index(drop=True)
+    df.to_csv(table_dir / "logo_generalization.csv", index=False)
+    plot_df = df.copy()
+    plot_df["label"] = plot_df["run"] + "\nheld-out " + plot_df["heldout_generator"].astype(str)
+    fig, ax = plt.subplots(figsize=(max(7.0, 0.9 * len(plot_df)), 4.4))
+    ax.bar(plot_df["label"], plot_df["macro_f1"], color="#5b8c5a")
+    ax.set_ylim(0, 1.05)
+    ax.set_ylabel("Held-out Macro-F1")
+    ax.set_xlabel("Leave-one-generator-out run")
+    ax.set_title("Cross-generator generalization")
+    ax.tick_params(axis="x", rotation=35)
+    plt.tight_layout()
+    plt.savefig(figure_dir / "logo_generalization_macro_f1.png", dpi=220)
+    plt.close()
+
+
+def save_confidence_assets(primary: Path, figure_dir: Path, table_dir: Path) -> None:
+    for task in TASKS:
+        task_dir = primary / task
+        details_path = task_dir / "confidence_details.csv"
+        coverage_path = task_dir / "confidence_coverage_accuracy.csv"
+        by_generator_path = task_dir / "confidence_by_generator.csv"
+        if coverage_path.exists():
+            coverage = pd.read_csv(coverage_path)
+            coverage.to_csv(table_dir / f"confidence_coverage_{task}.csv", index=False)
+            fig, ax1 = plt.subplots(figsize=(6.4, 4.2))
+            ax1.plot(coverage["coverage"], coverage["accuracy"], label="Accuracy", color="#3b73b9")
+            ax1.plot(coverage["coverage"], coverage["macro_f1"], label="Macro-F1", color="#b95f3b")
+            ax1.set_xlim(1.02, -0.02)
+            ax1.set_ylim(0, 1.05)
+            ax1.set_xlabel("Coverage after rejecting low-confidence samples")
+            ax1.set_ylabel("Score on retained samples")
+            ax1.set_title(f"Coverage-accuracy curve: {task}")
+            ax1.legend(loc="lower left")
+            plt.tight_layout()
+            plt.savefig(figure_dir / f"confidence_coverage_{task}.png", dpi=220)
+            plt.close()
+        if details_path.exists():
+            details = pd.read_csv(details_path)
+            details.to_csv(table_dir / f"confidence_details_{task}.csv", index=False)
+            fig, ax = plt.subplots(figsize=(6.2, 4.0))
+            for correct, group in details.groupby("correct"):
+                label = "correct" if bool(correct) else "wrong"
+                ax.hist(group["confidence"], bins=30, alpha=0.65, label=label)
+            ax.set_xlabel("Prediction confidence")
+            ax.set_ylabel("Samples")
+            ax.set_title(f"Confidence distribution: {task}")
+            ax.legend()
+            plt.tight_layout()
+            plt.savefig(figure_dir / f"confidence_histogram_{task}.png", dpi=220)
+            plt.close()
+        if by_generator_path.exists():
+            pd.read_csv(by_generator_path).to_csv(table_dir / f"confidence_by_generator_{task}.csv", index=False)
 
 
 def fft_power(path: Path, size: int = 256) -> np.ndarray:
@@ -637,6 +774,7 @@ def main() -> None:
     summary.to_csv(table_dir / "experiment_summary.csv", index=False)
     comparison.to_csv(table_dir / "model_comparison_long.csv", index=False)
     save_model_comparison_plot(comparison, figure_dir)
+    save_logo_generalization(collect_logo_generalization(outputs), figure_dir, table_dir)
     seed_stability = collect_seed_stability(summary)
     if not seed_stability.empty:
         seed_stability.to_csv(table_dir / "seed_stability.csv", index=False)
@@ -661,6 +799,7 @@ def main() -> None:
         save_feature_importance_plot(task_dir, task, figure_dir, table_dir)
         robust_task_dir = (robustness_primary / task) if robustness_primary else task_dir
         save_robustness_plot(robust_task_dir, task, figure_dir, table_dir)
+    save_confidence_assets(primary, figure_dir, table_dir)
     if robustness_compare_outputs:
         save_robustness_comparison(
             collect_robustness_comparison(robustness_compare_outputs),

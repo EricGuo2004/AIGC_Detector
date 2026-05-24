@@ -34,6 +34,8 @@ from src.training import (
     LGBM_PROFILE_CHOICES,
     MODEL_ARCHITECTURE_CHOICES,
     MODEL_SET_CHOICES,
+    _predict,
+    _predict_proba,
     feature_importance_df,
     train_and_select,
 )
@@ -307,6 +309,56 @@ def save_metrics_block(
     out_path.write_text(json.dumps(content, indent=2), encoding="utf-8")
 
 
+def _probability_entropy(proba: np.ndarray) -> float:
+    probs = np.asarray(proba, dtype=np.float64)
+    probs = probs / (probs.sum() + 1e-12)
+    if probs.size <= 1:
+        return 0.0
+    return float(-np.sum(probs * np.log(probs + 1e-12)) / np.log(probs.size))
+
+
+def save_prediction_details(
+    task_out: Path,
+    model: object,
+    X_val: np.ndarray,
+    y_val: np.ndarray,
+    val_samples: Sequence[Sample],
+    label_names: List[str],
+    val_groups: Sequence[str] | None = None,
+) -> None:
+    pred = _predict(model, X_val, val_groups)
+    proba = _predict_proba(model, X_val, val_groups)
+    ai_idx = next((idx for idx, label in enumerate(label_names) if label.lower() == "ai"), None)
+    rows = []
+    for idx, sample in enumerate(val_samples):
+        pred_id = int(pred[idx])
+        true_id = int(y_val[idx])
+        row = {
+            "path": str(sample.path),
+            "generator": sample_group(sample),
+            "true_label": label_names[true_id],
+            "pred_label": label_names[pred_id],
+            "correct": bool(true_id == pred_id),
+            "confidence": float("nan"),
+            "margin": float("nan"),
+            "entropy": float("nan"),
+            "ai_probability": float("nan"),
+        }
+        if proba is not None:
+            probs = np.asarray(proba[idx], dtype=np.float64)
+            order = np.sort(probs)
+            row["confidence"] = float(order[-1])
+            row["margin"] = float(order[-1] - order[-2]) if order.size >= 2 else float(order[-1])
+            row["entropy"] = _probability_entropy(probs)
+            if ai_idx is not None and ai_idx < probs.size:
+                row["ai_probability"] = float(probs[ai_idx])
+        rows.append(row)
+
+    details = pd.DataFrame(rows)
+    details.to_csv(task_out / "prediction_details.csv", index=False)
+    details[~details["correct"]].to_csv(task_out / "prediction_errors.csv", index=False)
+
+
 def run_task(
     task_name: str,
     train_samples: Sequence[Sample],
@@ -414,6 +466,7 @@ def run_task(
     model_compare_df = pd.DataFrame(all_rows)
     model_compare_df.to_csv(task_out / "model_comparison.csv", index=False)
     save_metrics_block(task_out / "metrics_summary.json", best.model_name, all_rows, label_names)
+    save_prediction_details(task_out, best.model, X_val, y_val, val_kept, label_names, val_groups)
 
     model_bundle = {
         "model": best.model,
