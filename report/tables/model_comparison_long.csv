@@ -25,6 +25,12 @@ outputs_4gen_1pct_robust,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,logreg,0
 outputs_4gen_1pct_robust,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,random_forest,0.825,0.8212896050826011,
 outputs_4gen_20pct_best,binary_ai_vs_nature,ai|nature,lightgbm,0.8980208333333334,0.8979962610133545,0.9633293836805557
 outputs_4gen_20pct_best,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.903125,0.902671231044436,
+outputs_4gen_20pct_fusion_mild_aug,binary_ai_vs_nature,ai|nature,lightgbm,0.9841666666666666,0.9841656213502636,0.9986385850694444
+outputs_4gen_20pct_fusion_mild_aug,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.9945833333333334,0.9945759507058208,
+outputs_4gen_20pct_fusion_robust_aug,binary_ai_vs_nature,ai|nature,lightgbm,0.980625,0.9806225475411732,0.9980674479166668
+outputs_4gen_20pct_fusion_robust_aug,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.9879166666666668,0.9879248197630016,
+outputs_4gen_20pct_stable_freq,binary_ai_vs_nature,ai|nature,lightgbm,0.890625,0.8905961105354383,0.9572101996527778
+outputs_4gen_20pct_stable_freq,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.8966666666666666,0.8963717736733525,
 outputs_4gen_50pct_best,binary_ai_vs_nature,ai|nature,lightgbm,0.89925,0.8992366740501432,0.9634945416666666
 outputs_4gen_50pct_best,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.9045833333333332,0.9042502268230116,
 outputs_4gen_5pct,binary_ai_vs_nature,ai|nature,lightgbm,0.8795833333333334,0.8795657490963524,0.9564506944444444
@@ -141,6 +147,8 @@ outputs_smoke_min,binary_ai_vs_nature,ai|nature,lightgbm,0.75,0.75,0.89583333333
 outputs_smoke_min,ai_subsource_attribution,ADM|BigGAN,logreg,1.0,1.0,1.0
 outputs_smoke_min,ai_subsource_attribution,ADM|BigGAN,lightgbm,0.9166666666666666,0.916083916083916,1.0
 outputs_smoke_min,ai_subsource_attribution,ADM|BigGAN,random_forest,0.9166666666666666,0.916083916083916,1.0
+outputs_smoke_stable_freq_min,binary_ai_vs_nature,ai|nature,lightgbm,0.9166666666666666,0.9165217391304348,0.9722222222222222
+outputs_smoke_stable_freq_min,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.9166666666666666,0.9115384615384616,
 outputs_v2_20pct_best,binary_ai_vs_nature,ai|nature,lightgbm,0.9910416666666668,0.9910416526692488,0.9995250868055556
 outputs_v2_20pct_best,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.9972916666666668,0.9972899840698772,
 outputs_v2_20pct_best_mild_aug,binary_ai_vs_nature,ai|nature,lightgbm,0.9846875,0.9846865653421228,0.9986875434027778
@@ -181,3 +189,7 @@ outputs_v2_smoke_multiscale_freq,binary_ai_vs_nature,ai|nature,lightgbm,0.895833
 outputs_v2_smoke_multiscale_freq,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.8333333333333334,0.8223276723276723,
 outputs_v2_smoke_residual_freq,binary_ai_vs_nature,ai|nature,lightgbm,0.9166666666666666,0.9165217391304348,0.9739583333333334
 outputs_v2_smoke_residual_freq,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.8333333333333334,0.8057692307692308,
+outputs_worker_fusion_mild_aug_20pct,binary_ai_vs_nature,ai|nature,lightgbm,0.9474342105263158,0.9474303057976012,0.98912101800554
+outputs_worker_fusion_mild_aug_20pct,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.9958333333333332,0.9958262726036256,
+outputs_worker_stable_freq_20pct,binary_ai_vs_nature,ai|nature,lightgbm,0.8903125,0.8902672245140206,0.9559748263888888
+outputs_worker_stable_freq_20pct,ai_subsource_attribution,ADM|BigGAN|VQDM|glide,lightgbm,0.888125,0.8878718053642719,

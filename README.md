@@ -117,7 +117,12 @@ Build report assets:
   --report-dir report `
   --primary-output outputs_v2_full_best `
   --robustness-output outputs_v2_full_best_robust_20pct `
-  --robustness-compare-outputs outputs_v2_full_best_robust_20pct outputs_4gen_full_best_robust_20pct
+  --robustness-compare-outputs `
+    outputs_v2_full_best_robust_20pct `
+    outputs_4gen_full_best_robust_20pct `
+    outputs_4gen_20pct_stable_freq_robust_20pct `
+    outputs_4gen_20pct_fusion_mild_aug_robust_20pct `
+    outputs_4gen_20pct_fusion_robust_aug_robust_20pct
 ```
 
 ## 4-Generator Extension Experiments
@@ -180,6 +185,15 @@ Validate the final submission loop:
 This checks data structure, final metrics, robustness CSVs, report assets,
 Notebook JSON, PDF page count, and Git hygiene. The generated checklist is
 written to `report/submission_checklist.md`.
+
+Current extension conclusions:
+
+- leave-one-generator-out generalization is uneven: held-out GLIDE is easiest,
+  while held-out ADM and VQDM reveal generator-specific spectral dependence;
+- `stable_freq` lowers clean performance but improves binary degraded stability;
+- `robust_aug` improves attribution degraded average F1 but does not replace the
+  clean best model;
+- confidence and coverage-accuracy assets are generated for risk analysis.
 
 ## Outputs
 

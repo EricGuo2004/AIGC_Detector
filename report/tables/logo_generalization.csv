@@ -1,0 +1,6 @@
+run,heldout_generator,train_generators,sample_fraction,feature_profile,feature_set,lgbm_profile,best_model,accuracy,macro_f1,auc,run_dir
+outputs_4gen_logo_20pct_fusion,ADM,"BigGAN,VQDM,glide",0.2,fusion_freq,all,wide,lightgbm,0.6275,0.5696405648267009,0.7455625,outputs_4gen_logo_20pct_fusion\leave_ADM_out
+outputs_4gen_logo_20pct_fusion,BigGAN,"ADM,VQDM,glide",0.2,fusion_freq,all,wide,lightgbm,0.7308333333333333,0.7119823800985472,0.9288361111111112,outputs_4gen_logo_20pct_fusion\leave_BigGAN_out
+outputs_4gen_logo_20pct_fusion,VQDM,"ADM,BigGAN,glide",0.2,fusion_freq,all,wide,lightgbm,0.5504166666666667,0.4386249693526433,0.7620680555555555,outputs_4gen_logo_20pct_fusion\leave_VQDM_out
+outputs_4gen_logo_20pct_fusion,glide,"ADM,BigGAN,VQDM",0.2,fusion_freq,all,wide,lightgbm,0.88875,0.8876914726315441,0.9644534722222222,outputs_4gen_logo_20pct_fusion\leave_glide_out
+outputs_4gen_logo_smoke_stable,ADM,"BigGAN,VQDM,glide",0.001,stable_freq,all,baseline,lightgbm,0.75,0.7333333333333334,0.888888888888889,outputs_4gen_logo_smoke_stable\leave_ADM_out
