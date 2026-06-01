@@ -240,7 +240,7 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
   \label{fig:confidence}
 \end{figure*}
 
-\clearpage
+\vspace{-0.4em}
 \section{Discussion}
 实验结果显示，AIGC 图像与真实图像在频率域中存在强可分模式。尤其是颜色频谱、多尺度功率谱和残差频谱，使浅层模型在四生成源 clean validation 中接近饱和。由于模型特征具有明确物理含义，feature importance、混淆矩阵和频谱示例可以解释模型关注的频段和通道。
 
@@ -249,6 +249,7 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
 \section{Conclusion}
 本文将 AIGC 图像检测转化为可解释的频域统计挖掘问题。最终 \texttt{fusion\_freq} full 模型在 clean validation 上达到二分类 macro-F1 0.9913 和归因 macro-F1 0.9991，显著超过早期灰度 FFT/DCT baseline。扩展实验进一步指出，clean 性能、鲁棒性与跨生成器泛化之间存在明显权衡：频谱融合特征可以大幅提升检测能力，但对后处理扰动敏感。该结论为课程项目提供了检测、归因、解释、鲁棒性诊断和可信度分析的完整闭环。
 
+\clearpage
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}
 
