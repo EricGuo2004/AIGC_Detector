@@ -19,6 +19,90 @@ from PIL import Image
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 TASKS = ["binary_ai_vs_nature", "ai_subsource_attribution"]
+TASK_LABELS = {
+    "binary_ai_vs_nature": "AI vs Nature",
+    "ai_subsource_attribution": "Source Attribution",
+}
+STYLE = {
+    "ink": "#1c2a3b",
+    "muted": "#827f67",
+    "teal": "#546f68",
+    "green": "#66a38a",
+    "orange": "#c9823a",
+    "rose": "#a97b74",
+    "plum": "#7f3a58",
+    "blue": "#4f77b6",
+    "grid": "#d9ddd8",
+    "paper": "#fbfbf8",
+}
+SERIES_COLORS = [STYLE["blue"], STYLE["green"], STYLE["orange"], STYLE["plum"], STYLE["teal"], STYLE["rose"]]
+
+
+def apply_ppt_style() -> None:
+    plt.rcParams.update(
+        {
+            "font.sans-serif": ["Microsoft YaHei", "SimHei", "SimSun", "Arial Unicode MS", "DejaVu Sans"],
+            "axes.unicode_minus": False,
+            "figure.facecolor": "white",
+            "axes.facecolor": STYLE["paper"],
+            "axes.edgecolor": STYLE["ink"],
+            "axes.labelcolor": STYLE["ink"],
+            "axes.titlecolor": STYLE["ink"],
+            "xtick.color": STYLE["ink"],
+            "ytick.color": STYLE["ink"],
+            "grid.color": STYLE["grid"],
+            "grid.linestyle": "--",
+            "grid.linewidth": 0.7,
+            "legend.frameon": False,
+            "axes.titlesize": 12,
+            "axes.labelsize": 10,
+            "xtick.labelsize": 8.5,
+            "ytick.labelsize": 8.5,
+        }
+    )
+
+
+def polish_axes(ax, *, grid_axis: str = "y") -> None:
+    ax.grid(axis=grid_axis, alpha=0.7)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color("#b8c0bd")
+    ax.spines["bottom"].set_color("#b8c0bd")
+
+
+def task_label(task: str) -> str:
+    return TASK_LABELS.get(task, task.replace("_", " "))
+
+
+RUN_LABELS = {
+    "outputs_4gen_5pct": "Gray 5%",
+    "outputs_4gen_10pct_best": "Tuned 10%",
+    "outputs_4gen_full_best": "Gray full",
+    "outputs_v2_5pct_color_freq_flat": "Color 5%",
+    "outputs_v2_5pct_multiscale_freq_flat": "Multi-scale 5%",
+    "outputs_v2_5pct_block_dct_flat": "Block DCT 5%",
+    "outputs_v2_5pct_residual_freq_flat": "Residual 5%",
+    "outputs_v2_5pct_fusion_freq_flat": "Fusion 5%",
+    "outputs_v2_full_best": "Fusion full",
+    "outputs_4gen_20pct_stable_freq": "Stable 20%",
+    "outputs_4gen_20pct_fusion_mild_aug": "Mild aug 20%",
+    "outputs_4gen_20pct_fusion_robust_aug": "Robust aug 20%",
+    "outputs_4gen_full_best_robust_20pct": "Gray full",
+    "outputs_v2_full_best_robust_20pct": "Fusion full",
+    "outputs_4gen_20pct_stable_freq_robust_20pct": "Stable 20%",
+    "outputs_4gen_20pct_fusion_mild_aug_robust_20pct": "Mild aug 20%",
+    "outputs_4gen_20pct_fusion_robust_aug_robust_20pct": "Robust aug 20%",
+}
+
+
+def run_label(run: str) -> str:
+    return RUN_LABELS.get(run, run.replace("outputs_", "").replace("_", " "))
+
+
+def save_plot(path: Path) -> None:
+    plt.tight_layout()
+    plt.savefig(path, dpi=240, facecolor="white")
+    plt.close()
 
 
 def parse_args() -> argparse.Namespace:
@@ -322,17 +406,16 @@ def save_scaleup_plot(selection: pd.DataFrame, figure_dir: Path) -> None:
         return
     df = df.sort_values("sample_fraction")
     fig, ax = plt.subplots(figsize=(6.3, 4.0))
-    ax.plot(df["sample_fraction"], df["binary_macro_f1"], marker="o", label="Binary")
-    ax.plot(df["sample_fraction"], df["attribution_macro_f1"], marker="o", label="Attribution")
-    ax.plot(df["sample_fraction"], df["combined_macro_f1"], marker="o", label="Average")
+    ax.plot(df["sample_fraction"], df["binary_macro_f1"], marker="o", linewidth=2.2, color=STYLE["blue"], label="真假检测")
+    ax.plot(df["sample_fraction"], df["attribution_macro_f1"], marker="o", linewidth=2.2, color=STYLE["green"], label="生成源归因")
+    ax.plot(df["sample_fraction"], df["combined_macro_f1"], marker="o", linewidth=2.2, color=STYLE["orange"], label="双任务平均")
     ax.set_ylim(0, 1.05)
-    ax.set_xlabel("Sample fraction")
+    ax.set_xlabel("训练抽样比例")
     ax.set_ylabel("Macro-F1")
-    ax.set_title("Baseline scale-up results")
+    ax.set_title("Baseline scale-up results / 抽样比例扩大")
     ax.legend(loc="lower right")
-    plt.tight_layout()
-    plt.savefig(figure_dir / "scaleup_macro_f1.png", dpi=220)
-    plt.close()
+    polish_axes(ax)
+    save_plot(figure_dir / "scaleup_macro_f1.png")
 
 
 def save_enhanced_search_plot(selection: pd.DataFrame, figure_dir: Path) -> None:
@@ -344,34 +427,48 @@ def save_enhanced_search_plot(selection: pd.DataFrame, figure_dir: Path) -> None
     df = df.sort_values("combined_macro_f1", ascending=True)
     df["config"] = df["stage"] + "\n" + df["lgbm_profile"].astype(str)
     fig, ax = plt.subplots(figsize=(6.8, max(3.8, 0.42 * len(df))))
-    ax.barh(df["config"], df["combined_macro_f1"], color="#7a6fac")
+    ax.barh(df["config"], df["combined_macro_f1"], color=STYLE["plum"])
     ax.set_xlim(0, 1.05)
-    ax.set_xlabel("Average Macro-F1")
-    ax.set_ylabel("Enhanced run")
-    ax.set_title("Enhanced feature search")
-    plt.tight_layout()
-    plt.savefig(figure_dir / "enhanced_feature_search_macro_f1.png", dpi=220)
-    plt.close()
+    ax.set_xlabel("双任务平均 Macro-F1")
+    ax.set_ylabel("增强特征配置")
+    ax.set_title("Enhanced feature search / 增强频域特征搜索")
+    polish_axes(ax)
+    save_plot(figure_dir / "enhanced_feature_search_macro_f1.png")
 
 
 def save_model_comparison_plot(comparison: pd.DataFrame, figure_dir: Path) -> None:
     if comparison.empty or "macro_f1" not in comparison:
         return
     df = comparison.copy()
-    non_tuning = df[~df["run"].map(is_tuning_run)].copy()
-    if not non_tuning.empty:
-        df = non_tuning
-    df["series"] = df["run"] + "\n" + df["task"].str.replace("_", "\n")
-    pivot = df.pivot_table(index="series", columns="model", values="macro_f1", aggfunc="first")
-    ax = pivot.plot(kind="bar", figsize=(max(8, len(pivot) * 0.8), 4.8), rot=45)
+    selected_runs = [
+        "outputs_4gen_5pct",
+        "outputs_4gen_10pct_best",
+        "outputs_4gen_full_best",
+        "outputs_v2_5pct_color_freq_flat",
+        "outputs_v2_5pct_multiscale_freq_flat",
+        "outputs_v2_5pct_block_dct_flat",
+        "outputs_v2_5pct_residual_freq_flat",
+        "outputs_v2_5pct_fusion_freq_flat",
+        "outputs_v2_full_best",
+        "outputs_4gen_20pct_stable_freq",
+        "outputs_4gen_20pct_fusion_mild_aug",
+        "outputs_4gen_20pct_fusion_robust_aug",
+    ]
+    df = df[df["run"].isin(selected_runs)].copy()
+    if df.empty:
+        return
+    df = df.sort_values("macro_f1", ascending=False).drop_duplicates(["run", "task"], keep="first")
+    df["run_label"] = pd.Categorical(df["run"].map(run_label), [run_label(r) for r in selected_runs], ordered=True)
+    pivot = df.pivot_table(index="run_label", columns="task", values="macro_f1", aggfunc="first").sort_index()
+    pivot = pivot.rename(columns={task: task_label(task) for task in TASKS})
+    ax = pivot.plot(kind="bar", figsize=(9.6, 4.8), rot=28, color=[STYLE["blue"], STYLE["green"]])
     ax.set_ylabel("Macro-F1")
-    ax.set_xlabel("Experiment")
+    ax.set_xlabel("Experiment output / 实验输出")
     ax.set_ylim(0, 1.05)
-    ax.set_title("Model comparison across experiments")
-    ax.legend(title="Model", loc="lower right")
-    plt.tight_layout()
-    plt.savefig(figure_dir / "model_comparison_macro_f1.png", dpi=220)
-    plt.close()
+    ax.set_title("Key experiment comparison / 关键实验对比")
+    ax.legend(title="Task / 任务", loc="center left", bbox_to_anchor=(1.01, 0.5))
+    polish_axes(ax)
+    save_plot(figure_dir / "model_comparison_macro_f1.png")
 
 
 def collect_single_vs_fusion(summary: pd.DataFrame) -> pd.DataFrame:
@@ -440,16 +537,14 @@ def save_single_vs_fusion_plot(single_vs_fusion: pd.DataFrame, figure_dir: Path)
     pivot = df.pivot_table(index="profile_label", columns="task_label", values="macro_f1", aggfunc="first")
     order = ["Color", "Multi-scale", "Block DCT", "Residual", "Fusion 5%", "Fusion full"]
     pivot = pivot.reindex([x for x in order if x in pivot.index])
-    ax = pivot.plot(kind="bar", figsize=(8.8, 4.4), ylim=(0.75, 1.01), width=0.75)
-    ax.set_xlabel("Feature profile")
+    ax = pivot.plot(kind="bar", figsize=(8.8, 4.4), ylim=(0.75, 1.01), width=0.75, color=[STYLE["blue"], STYLE["green"]])
+    ax.set_xlabel("频域特征 profile")
     ax.set_ylabel("Macro-F1")
-    ax.set_title("Single-domain frequency profiles vs fused frequency profile")
-    ax.grid(axis="y", linestyle="--", alpha=0.35)
-    ax.legend(title="Task", loc="lower right")
+    ax.set_title("Single-domain vs fused frequency profile / 单一频域与融合频域")
+    ax.legend(title="任务", loc="center left", bbox_to_anchor=(1.01, 0.5))
+    polish_axes(ax)
     plt.xticks(rotation=20, ha="right")
-    plt.tight_layout()
-    plt.savefig(figure_dir / "single_vs_fusion_feature_profiles.png", dpi=220)
-    plt.close()
+    save_plot(figure_dir / "single_vs_fusion_feature_profiles.png")
 
 
 def save_ablation_plot(ablation: pd.DataFrame, figure_dir: Path) -> None:
@@ -458,14 +553,13 @@ def save_ablation_plot(ablation: pd.DataFrame, figure_dir: Path) -> None:
     for task, group in ablation.groupby("task"):
         group = group.sort_values("macro_f1", ascending=True)
         fig, ax = plt.subplots(figsize=(6.4, max(3.8, 0.42 * len(group))))
-        ax.barh(group["feature_set"], group["macro_f1"], color="#4b8f8c")
+        ax.barh(group["feature_set"], group["macro_f1"], color=STYLE["teal"])
         ax.set_xlim(0, 1.05)
         ax.set_xlabel("Macro-F1")
-        ax.set_ylabel("Feature set")
-        ax.set_title(f"Feature ablation: {task}")
-        plt.tight_layout()
-        plt.savefig(figure_dir / f"feature_ablation_{task}.png", dpi=220)
-        plt.close()
+        ax.set_ylabel("特征组")
+        ax.set_title(f"Feature ablation / 单组频域消融：{task_label(task)}")
+        polish_axes(ax)
+        save_plot(figure_dir / f"feature_ablation_{task}.png")
 
 
 def save_lgbm_tuning_plot(tuning: pd.DataFrame, figure_dir: Path) -> None:
@@ -475,14 +569,13 @@ def save_lgbm_tuning_plot(tuning: pd.DataFrame, figure_dir: Path) -> None:
         group = group.sort_values("macro_f1", ascending=True).copy()
         group["config"] = group["profile"] + "\n" + group["feature_set"]
         fig, ax = plt.subplots(figsize=(6.6, max(3.8, 0.46 * len(group))))
-        ax.barh(group["config"], group["macro_f1"], color="#6f7fb7")
+        ax.barh(group["config"], group["macro_f1"], color=STYLE["blue"])
         ax.set_xlim(0, 1.05)
         ax.set_xlabel("Macro-F1")
-        ax.set_ylabel("Profile / feature set")
-        ax.set_title(f"LightGBM tuning: {task}")
-        plt.tight_layout()
-        plt.savefig(figure_dir / f"lgbm_tuning_{task}.png", dpi=220)
-        plt.close()
+        ax.set_ylabel("参数 profile / 特征集")
+        ax.set_title(f"LightGBM tuning / 参数调优：{task_label(task)}")
+        polish_axes(ax)
+        save_plot(figure_dir / f"lgbm_tuning_{task}.png")
 
 
 def read_confusion(path: Path) -> pd.DataFrame:
@@ -504,10 +597,10 @@ def save_confusion_plot(task_dir: Path, task: str, figure_dir: Path) -> None:
     labels = metrics.get("labels", [])
     cm = read_confusion(path).to_numpy()
     fig, ax = plt.subplots(figsize=(4.8, 4.2))
-    im = ax.imshow(cm, cmap="Blues")
-    ax.set_title(f"{task} confusion matrix")
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("True")
+    im = ax.imshow(cm, cmap="YlGnBu")
+    ax.set_title(f"Confusion matrix / 混淆矩阵：{task_label(task)}")
+    ax.set_xlabel("预测标签")
+    ax.set_ylabel("真实标签")
     if labels and len(labels) == cm.shape[0]:
         ax.set_xticks(range(len(labels)), labels, rotation=30, ha="right")
         ax.set_yticks(range(len(labels)), labels)
@@ -516,10 +609,10 @@ def save_confusion_plot(task_dir: Path, task: str, figure_dir: Path) -> None:
             ax.text(j, i, str(cm[i, j]), ha="center", va="center", color="black")
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     plt.tight_layout()
-    plt.savefig(figure_dir / f"confusion_{task}_lightgbm.png", dpi=220)
+    fig.savefig(figure_dir / f"confusion_{task}_lightgbm.png", dpi=240, facecolor="white")
     if best_model != "lightgbm":
-        plt.savefig(figure_dir / f"confusion_{task}_{best_model}.png", dpi=220)
-    plt.close()
+        fig.savefig(figure_dir / f"confusion_{task}_{best_model}.png", dpi=240, facecolor="white")
+    plt.close(fig)
 
 
 def save_feature_importance_plot(task_dir: Path, task: str, figure_dir: Path, table_dir: Path) -> None:
@@ -531,12 +624,11 @@ def save_feature_importance_plot(task_dir: Path, task: str, figure_dir: Path, ta
         return
     df.to_csv(table_dir / f"top_features_{task}.csv", index=False)
     fig, ax = plt.subplots(figsize=(6.2, 5.8))
-    ax.barh(df["feature"][::-1], df["importance"][::-1], color="#3b73b9")
-    ax.set_xlabel("Importance")
-    ax.set_title(f"Top-20 feature importance: {task}")
-    plt.tight_layout()
-    plt.savefig(figure_dir / f"feature_importance_{task}_top20.png", dpi=220)
-    plt.close()
+    ax.barh(df["feature"][::-1], df["importance"][::-1], color=STYLE["blue"])
+    ax.set_xlabel("LightGBM importance")
+    ax.set_title(f"Top-20 feature importance / 特征重要性：{task_label(task)}")
+    polish_axes(ax)
+    save_plot(figure_dir / f"feature_importance_{task}_top20.png")
 
 
 def save_robustness_plot(task_dir: Path, task: str, figure_dir: Path, table_dir: Path) -> None:
@@ -554,15 +646,15 @@ def save_robustness_plot(task_dir: Path, task: str, figure_dir: Path, table_dir:
         ax.axhline(clean_f1, color="#555555", linestyle="--", linewidth=1.1, label=f"clean ({clean_f1:.3f})")
     plot_df = df[df["attack"] != "clean"].copy()
     for attack, group in plot_df.groupby("attack"):
-        ax.plot(group["level"].astype(str), group["macro_f1"], marker="o", label=attack)
+        color = {"jpeg": STYLE["blue"], "resize": STYLE["green"], "noise": STYLE["orange"]}.get(str(attack), STYLE["teal"])
+        ax.plot(group["level"].astype(str), group["macro_f1"], marker="o", linewidth=2.0, color=color, label=attack)
     ax.set_ylim(0, 1.05)
-    ax.set_xlabel("Attack level")
+    ax.set_xlabel("扰动强度")
     ax.set_ylabel("Macro-F1")
-    ax.set_title(f"Robustness: {task}")
-    ax.legend(title="Attack")
-    plt.tight_layout()
-    plt.savefig(figure_dir / f"robustness_{task}.png", dpi=220)
-    plt.close()
+    ax.set_title(f"Robustness / 鲁棒性：{task_label(task)}")
+    ax.legend(title="扰动")
+    polish_axes(ax)
+    save_plot(figure_dir / f"robustness_{task}.png")
 
 
 def has_robustness_results(output_dir: Path) -> bool:
@@ -633,15 +725,31 @@ def save_robustness_comparison(df: pd.DataFrame, figure_dir: Path, table_dir: Pa
         plot_df["condition"] = pd.Categorical(plot_df["condition"], categories=order, ordered=True)
         pivot = plot_df.pivot_table(index="condition", columns="run", values="macro_f1", aggfunc="first")
         pivot = pivot.dropna(how="all")
-        ax = pivot.plot(kind="bar", figsize=(9.0, 4.8), rot=35)
+        pivot = pivot.rename(columns={run: run_label(run) for run in pivot.columns})
+        display_labels = {
+            "clean=none": "Clean",
+            "jpeg=95": "JPEG 95",
+            "jpeg=75": "JPEG 75",
+            "jpeg=50": "JPEG 50",
+            "resize=0.5": "Resize .5",
+            "resize=0.75": "Resize .75",
+            "resize=1.5": "Resize 1.5",
+            "noise=2": "Noise 2",
+            "noise=5": "Noise 5",
+            "noise=10": "Noise 10",
+        }
+        pivot.index = [display_labels.get(str(idx), str(idx)) for idx in pivot.index]
+        fig, ax = plt.subplots(figsize=(8.4, 4.6))
+        for color, column in zip(SERIES_COLORS, pivot.columns):
+            ax.plot(pivot.index, pivot[column], marker="o", linewidth=2.0, markersize=4.5, color=color, label=column)
         ax.set_ylim(0, 1.05)
-        ax.set_xlabel("Condition")
+        ax.set_xlabel("Degradation condition / 扰动条件")
         ax.set_ylabel("Macro-F1")
-        ax.set_title(f"Robustness comparison: {task}")
-        ax.legend(title="Run", loc="lower left")
-        plt.tight_layout()
-        plt.savefig(figure_dir / f"robustness_comparison_{task}.png", dpi=220)
-        plt.close()
+        ax.set_title(f"Robustness comparison / 鲁棒性对比: {task_label(task)}")
+        ax.tick_params(axis="x", rotation=28)
+        ax.legend(title="Output / 实验", loc="center left", bbox_to_anchor=(1.01, 0.5))
+        polish_axes(ax)
+        save_plot(figure_dir / f"robustness_comparison_{task}.png")
 
 
 def save_robustness_tradeoff(df: pd.DataFrame, figure_dir: Path, table_dir: Path) -> None:
@@ -668,16 +776,15 @@ def save_robustness_tradeoff(df: pd.DataFrame, figure_dir: Path, table_dir: Path
     for task, group in tradeoff.groupby("task"):
         fig, ax = plt.subplots(figsize=(5.6, 4.4))
         for _, row in group.iterrows():
-            ax.scatter(row["clean_macro_f1"], row["degraded_mean_macro_f1"], s=70)
+            ax.scatter(row["clean_macro_f1"], row["degraded_mean_macro_f1"], s=72, color=SERIES_COLORS[len(ax.collections) % len(SERIES_COLORS)], edgecolor="white", linewidth=0.8)
             ax.text(row["clean_macro_f1"] + 0.005, row["degraded_mean_macro_f1"], str(row["run"]), fontsize=8)
         ax.set_xlim(0, 1.05)
         ax.set_ylim(0, 1.05)
         ax.set_xlabel("Clean Macro-F1")
-        ax.set_ylabel("Mean Degraded Macro-F1")
-        ax.set_title(f"Clean vs degraded tradeoff: {task}")
-        plt.tight_layout()
-        plt.savefig(figure_dir / f"robustness_tradeoff_{task}.png", dpi=220)
-        plt.close()
+        ax.set_ylabel("Degraded 平均 Macro-F1")
+        ax.set_title(f"Clean vs degraded tradeoff / 取舍：{task_label(task)}")
+        polish_axes(ax)
+        save_plot(figure_dir / f"robustness_tradeoff_{task}.png")
 
 
 def collect_logo_generalization(output_dirs: List[Path]) -> pd.DataFrame:
@@ -725,15 +832,14 @@ def save_logo_generalization(df: pd.DataFrame, figure_dir: Path, table_dir: Path
     plot_df = df.copy()
     plot_df["label"] = plot_df["run"] + "\nheld-out " + plot_df["heldout_generator"].astype(str)
     fig, ax = plt.subplots(figsize=(max(7.0, 0.9 * len(plot_df)), 4.4))
-    ax.bar(plot_df["label"], plot_df["macro_f1"], color="#5b8c5a")
+    ax.bar(plot_df["label"], plot_df["macro_f1"], color=STYLE["green"])
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("Held-out Macro-F1")
-    ax.set_xlabel("Leave-one-generator-out run")
-    ax.set_title("Cross-generator generalization")
+    ax.set_xlabel("留一生成器实验")
+    ax.set_title("Cross-generator generalization / 跨生成器泛化")
     ax.tick_params(axis="x", rotation=35)
-    plt.tight_layout()
-    plt.savefig(figure_dir / "logo_generalization_macro_f1.png", dpi=220)
-    plt.close()
+    polish_axes(ax)
+    save_plot(figure_dir / "logo_generalization_macro_f1.png")
 
 
 def save_confidence_assets(primary: Path, figure_dir: Path, table_dir: Path) -> None:
@@ -746,31 +852,30 @@ def save_confidence_assets(primary: Path, figure_dir: Path, table_dir: Path) -> 
             coverage = pd.read_csv(coverage_path)
             coverage.to_csv(table_dir / f"confidence_coverage_{task}.csv", index=False)
             fig, ax1 = plt.subplots(figsize=(6.4, 4.2))
-            ax1.plot(coverage["coverage"], coverage["accuracy"], label="Accuracy", color="#3b73b9")
-            ax1.plot(coverage["coverage"], coverage["macro_f1"], label="Macro-F1", color="#b95f3b")
+            ax1.plot(coverage["coverage"], coverage["accuracy"], label="Accuracy", color=STYLE["blue"], linewidth=2.0)
+            ax1.plot(coverage["coverage"], coverage["macro_f1"], label="Macro-F1", color=STYLE["orange"], linewidth=2.0)
             ax1.set_xlim(1.02, -0.02)
             ax1.set_ylim(0, 1.05)
-            ax1.set_xlabel("Coverage after rejecting low-confidence samples")
-            ax1.set_ylabel("Score on retained samples")
-            ax1.set_title(f"Coverage-accuracy curve: {task}")
+            ax1.set_xlabel("拒识低置信度样本后的 coverage")
+            ax1.set_ylabel("保留样本得分")
+            ax1.set_title(f"Coverage-accuracy / 置信度拒识：{task_label(task)}")
             ax1.legend(loc="lower left")
-            plt.tight_layout()
-            plt.savefig(figure_dir / f"confidence_coverage_{task}.png", dpi=220)
-            plt.close()
+            polish_axes(ax1)
+            save_plot(figure_dir / f"confidence_coverage_{task}.png")
         if details_path.exists():
             details = pd.read_csv(details_path)
             details.to_csv(table_dir / f"confidence_details_{task}.csv", index=False)
             fig, ax = plt.subplots(figsize=(6.2, 4.0))
             for correct, group in details.groupby("correct"):
                 label = "correct" if bool(correct) else "wrong"
-                ax.hist(group["confidence"], bins=30, alpha=0.65, label=label)
-            ax.set_xlabel("Prediction confidence")
-            ax.set_ylabel("Samples")
-            ax.set_title(f"Confidence distribution: {task}")
+                color = STYLE["green"] if bool(correct) else STYLE["rose"]
+                ax.hist(group["confidence"], bins=30, alpha=0.72, label=label, color=color)
+            ax.set_xlabel("预测置信度")
+            ax.set_ylabel("样本数")
+            ax.set_title(f"Confidence distribution / 置信度分布：{task_label(task)}")
             ax.legend()
-            plt.tight_layout()
-            plt.savefig(figure_dir / f"confidence_histogram_{task}.png", dpi=220)
-            plt.close()
+            polish_axes(ax)
+            save_plot(figure_dir / f"confidence_histogram_{task}.png")
         if by_generator_path.exists():
             pd.read_csv(by_generator_path).to_csv(table_dir / f"confidence_by_generator_{task}.csv", index=False)
 
@@ -800,11 +905,10 @@ def save_spectrum_examples(dataset_root: Path, figure_dir: Path) -> None:
             if image_path is not None:
                 power = fft_power(image_path)
                 ax.imshow(power, cmap="magma")
-            ax.set_title(f"{gen.name} {label}", fontsize=9)
+            ax.set_title(f"{gen.name} {label}", fontsize=9, color=STYLE["ink"])
             ax.set_axis_off()
-    plt.tight_layout()
-    plt.savefig(figure_dir / "spectrum_examples.png", dpi=220)
-    plt.close()
+    fig.suptitle("FFT power spectrum examples / 频谱示例", fontsize=13, color=STYLE["ink"])
+    save_plot(figure_dir / "spectrum_examples.png")
 
 
 def write_manifest(
@@ -829,6 +933,7 @@ def write_manifest(
 
 def main() -> None:
     args = parse_args()
+    apply_ppt_style()
     dataset_root = Path(args.dataset_root)
     report_dir = Path(args.report_dir)
     figure_dir = report_dir / "figures"

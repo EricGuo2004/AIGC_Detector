@@ -29,15 +29,15 @@
 | dataset | glide/val/ai | PASS | 6000 images |
 | dataset | glide/val/nature | PASS | 6000 images |
 | report | report/main.tex | PASS | 20678 bytes |
-| report | report/main.pdf | PASS | 6595570 bytes |
+| report | report/main.pdf | PASS | 5116557 bytes |
 | report | report/references.bib | PASS | 893 bytes |
 | report | report/tables/optimization_v2_summary.csv | PASS | 5277 bytes |
 | report | report/tables/robustness_comparison.csv | PASS | 28510 bytes |
 | report | report/tables/dataset_counts.csv | PASS | 173 bytes |
 | report | report/figures/optimization_v2_macro_f1.png | PASS | 130260 bytes |
-| report | report/figures/robustness_comparison_binary_ai_vs_nature.png | PASS | 134195 bytes |
-| report | report/figures/robustness_comparison_ai_subsource_attribution.png | PASS | 132303 bytes |
-| report | report/figures/feature_importance_binary_ai_vs_nature_top20.png | PASS | 137872 bytes |
+| report | report/figures/robustness_comparison_binary_ai_vs_nature.png | PASS | 241559 bytes |
+| report | report/figures/robustness_comparison_ai_subsource_attribution.png | PASS | 242387 bytes |
+| report | report/figures/feature_importance_binary_ai_vs_nature_top20.png | PASS | 203366 bytes |
 | report | pdf page count | PASS | 7 pages, max 7 |
 | notebook | valid JSON | PASS | 25 cells, 13 code cells |
 | results | primary output | PASS | outputs_v2_full_best |
@@ -55,12 +55,31 @@
 | git | large/local directories excluded | PASS | ok |
 | git | working tree status | WARN | M notebooks/final_project_aigc_detector.ipynb
  M report/asset_manifest.md
+ M report/figures/confidence_coverage_ai_subsource_attribution.png
+ M report/figures/confidence_coverage_binary_ai_vs_nature.png
+ M report/figures/confidence_histogram_ai_subsource_attribution.png
+ M report/figures/confidence_histogram_binary_ai_vs_nature.png
+ M report/figures/confusion_ai_subsource_attribution_lightgbm.png
+ M report/figures/confusion_binary_ai_vs_nature_lightgbm.png
+ M report/figures/enhanced_feature_search_macro_f1.png
+ M report/figures/feature_ablation_ai_subsource_attribution.png
+ M report/figures/feature_ablation_binary_ai_vs_nature.png
+ M report/figures/feature_importance_ai_subsource_attribution_top20.png
+ M report/figures/feature_importance_binary_ai_vs_nature_top20.png
+ M report/figures/lgbm_tuning_ai_subsource_attribution.png
+ M report/figures/lgbm_tuning_binary_ai_vs_nature.png
+ M report/figures/logo_generalization_macro_f1.png
+ M report/figures/model_comparison_macro_f1.png
+ M report/figures/robustness_ai_subsource_attribution.png
+ M report/figures/robustness_binary_ai_vs_nature.png
+ M report/figures/robustness_comparison_ai_subsource_attribution.png
+ M report/figures/robustness_comparison_binary_ai_vs_nature.png
+ M report/figures/robustness_tradeoff_ai_subsource_attribution.png
+ M report/figures/robustness_tradeoff_binary_ai_vs_nature.png
+ M report/figures/scaleup_macro_f1.png
+ M report/figures/single_vs_fusion_feature_profiles.png
+ M report/figures/spectrum_examples.png
  M report/main.pdf
- M report/main.tex
- M report/submission_checklist.md
- M report/tables/submission_validation.csv
  M scripts/build_report_assets.py
 ?? docs/PART_A_PRESENTATION_PACKAGE.md
-?? docs/PRESENTATION_10MIN_SCRIPT.md
-?? report/figures/single_vs_fusion_feature_profiles.png
-?? report/tables/single_vs_fusion_profiles.csv |
+?? docs/PRESENTATION_10MIN_SCRIPT.md |
