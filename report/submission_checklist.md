@@ -28,8 +28,8 @@
 | dataset | glide/train/nature | PASS | 162000 images |
 | dataset | glide/val/ai | PASS | 6000 images |
 | dataset | glide/val/nature | PASS | 6000 images |
-| report | report/main.tex | PASS | 31828 bytes |
-| report | report/main.pdf | PASS | 5182075 bytes |
+| report | report/main.tex | PASS | 42527 bytes |
+| report | report/main.pdf | PASS | 5207008 bytes |
 | report | report/references.bib | PASS | 893 bytes |
 | report | report/tables/optimization_v2_summary.csv | PASS | 5365 bytes |
 | report | report/tables/robustness_comparison.csv | PASS | 28510 bytes |
@@ -55,5 +55,7 @@
 | git | large/local directories excluded | PASS | ok |
 | git | working tree status | WARN | M report/main.pdf
  M report/main.tex
+ M report/submission_checklist.md
+ M report/tables/submission_validation.csv
 ?? docs/PART_A_PRESENTATION_PACKAGE.md
 ?? docs/PRESENTATION_10MIN_SCRIPT.md |
