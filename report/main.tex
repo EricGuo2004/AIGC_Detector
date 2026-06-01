@@ -67,12 +67,22 @@ P(u,v)=\log(1+|\mathcal{F}(I)(u,v)|^2).
 \]
 baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量比例、频谱斜率、高频残差统计、patch 级高频变化和 DCT 径向谱。为进一步提分，本文实现 \texttt{fusion\_freq} profile：在 RGB 与 YCbCr 通道上提取颜色频谱，在 $128/256/384$ 三个尺度上提取多尺度频谱，加入 8x8 block-DCT AC 能量和块边界统计，并对高通、median 与 Laplacian 残差再做频谱统计。所有特征都对应明确的信号处理统计，不依赖语义表征。
 
+这些频域特征的设计目标不是简单增加维度，而是覆盖生成图像可能留下指纹的几个互补来源。第一，径向功率谱和频谱斜率描述自然图像常见的能量衰减规律。如果生成模型的上采样、去噪或后处理链路改变了高低频能量分配，径向统计会直接反映这种偏移。第二，角向能量与块 DCT 统计用于捕获方向性纹理和局部周期结构。真实相机图像中的纹理方向通常与场景内容相关，而生成模型可能产生更规则的方向性伪影；JPEG-like 块边界也会改变局部 DCT AC 能量。第三，颜色频谱把灰度空间中被平均掉的通道差异重新引入模型。扩散模型和 GAN 在 RGB 或 YCbCr 通道上可能具有不同的高频噪声分布，因此颜色频域特征在第二轮实验中贡献最大。第四，残差频谱弱化低频语义轮廓，突出高通、median 和 Laplacian 残差中的细粒度噪声。该组特征有助于区分自然图像的传感器噪声与生成图像的合成残差。
+
+本文同时保留了“单一频域”和“融合频域”两套实验口径。单一频域实验用于回答某一类信号是否独立有效，例如只用颜色频谱或只用 block-DCT 是否已经能完成检测；融合频域实验则用于回答这些信号是否互补。这样做可以避免把提升简单归因于特征数量增加。若某个单一 profile 已经接近融合 profile，则说明主要信息集中在该频域；若多个单一 profile 都弱于融合 profile，则说明不同频域捕获了不同类型的生成痕迹。后续结果显示颜色频谱最强，但融合频域仍进一步提升，因此最终方法采用 \texttt{fusion\_freq} 作为主路线。
+
 监督模型以 LightGBM~\cite{ke2017lightgbm} 为主，RandomForest 和 LogisticRegression 作为早期 baseline。最终路线使用 flat LightGBM、多分类归因、\texttt{wide} 参数 profile 和二分类阈值校准。LightGBM 训练优先使用 GPU；若 GPU 在复杂多分类训练中失败，代码自动 fallback 到 CPU。频谱特征提取主要依赖 CPU 多进程和 feature cache。信号处理背景参考 Oppenheim 等人的经典教材~\cite{oppenheim1999discrete}。
+
+选择 LightGBM 的原因有三点。首先，它能处理数百到上千维手工统计特征，并给出稳定的 feature importance，因此适合课程要求中的“可解释模型”。其次，它比深度 CNN/ViT 更容易复现，训练结果主要受特征和抽样策略影响，而不是受大量超参数或预训练权重影响。第三，树模型可以较自然地建模频带比值、颜色通道能量和残差统计之间的非线性组合。为了控制过拟合，本文没有把所有中间实验都作为最终结论，而是使用 5\% 调参、10\% 验证、20/50/full scale-up 的逐级流程来确认提升是否稳定。
 
 \section{Experiments}
 实验分为五层。第一层使用 1\%、5\% 和 10\% 抽样验证原始 FFT/DCT baseline，并完成 LightGBM 调参。第二层进行 20\%、50\% 和 full scale-up，确认样本量扩大能稳定提升 clean performance。第三层进行频域增强，比较 \texttt{color\_freq}、\texttt{multiscale\_freq}、\texttt{block\_dct}、\texttt{residual\_freq} 和 \texttt{fusion\_freq}。第四层固定最终模型，在 validation 图像上施加 JPEG、resize 和 Gaussian noise，诊断后处理扰动下的失效模式。第五层扩展分析跨生成器泛化、鲁棒训练、稳健频谱 profile 和置信度拒识。
 
 所有主要结果通过 \texttt{metrics\_summary.json}、\texttt{model\_comparison.csv}、混淆矩阵、feature importance、robustness CSV 和 confidence CSV 自动汇总到 \texttt{report/tables} 与 \texttt{report/figures}。Notebook 只读取这些资产，不重新执行大规模训练。
+
+工程实现上，实验被拆分为可中断、可恢复的输出目录。每个任务目录都保存模型比较表、最佳模型、混淆矩阵、错误样本和配置文件；特征缓存单独存放，避免重复扫描完整图像集。这样做的意义在于：一方面，full-scale 频谱特征提取耗时较长，缓存能保证后续调参、鲁棒性评估和 Notebook 展示不必重复计算；另一方面，不同阶段的输出目录天然形成实验记录，报告中的每张图都可以追溯到具体 CSV 或 JSON。对于队友分机器运行得到的结果，本文也只把最终 CSV/PNG 资产纳入报告，不把数据集、缓存和大模型输出提交到仓库。
+
+评价指标以 macro-F1 为主，因为二分类与归因任务都需要避免被某个类别的大样本量掩盖。二分类同时记录 AUC，用于观察阈值之外的排序能力；归因任务主要关注混淆矩阵，尤其是 ADM 与 VQDM 之间的系统性错误。鲁棒性部分不只看 clean 分数，还统计每种扰动级别下的 macro-F1、预测分布和 degraded 平均 F1。跨生成器泛化实验只训练二分类器，因为它更直接回答“是否学到通用 AIGC 指纹”，而不是在未见生成源标签不存在时强行做归因。
 
 \section{Results and Analysis}
 \subsection{Clean Performance}
@@ -188,6 +198,12 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
   \label{fig:feature-importance}
 \end{figure}
 
+特征重要性进一步支持了“颜色频谱 + 局部 DCT + 残差统计”共同起作用的结论。Top feature 中既包含 YCbCr 通道的高频标准差、band energy 和径向 DCT 统计，也包含 block-DCT 中高频 AC 能量和 residual median 高频统计。这说明模型并不是只依赖单个阈值或单个频段，而是在多个互补频域视角上形成判别边界。对于二分类，颜色通道高频和中高频能量最有用，符合生成图像在颜色噪声、去噪残差和上采样纹理上存在系统偏差的假设。对于归因任务，特征重要性更偏向生成器特定的频谱形态，例如 ADM/VQDM 的残差频谱差异、BigGAN 的局部纹理周期性和 GLIDE 的频带能量分布。
+
+错误分析也说明模型的失败不是随机噪声。二分类中的误判主要出现在 ADM 与 VQDM：部分 AI 图像被判成 nature，说明这些生成源在某些样本上的频谱更接近自然图像统计；少量 nature 被判成 AI，通常具有强纹理、重复边缘或压缩伪影，这些模式会被浅层频谱模型误认为生成痕迹。归因任务中，BigGAN 和 GLIDE 几乎不混淆，说明它们的频谱签名较稳定；ADM 与 VQDM 的混淆更多，说明这两个扩散/量化扩散相关生成源在全局功率谱和残差噪声上更相近。因此，后续提升归因任务的关键不是继续扩大已有样本，而是设计专门区分 ADM/VQDM 的专家特征或 pairwise classifier。
+
+从可解释性角度看，错误样本列表比单一准确率更重要。项目导出的 \texttt{prediction\_errors.csv} 记录了路径、真实标签、预测标签和模型置信度，可用于检查高置信度错误是否集中在特定生成器或特定图像类型。如果高置信度错误集中在纹理复杂的 nature 图像，说明模型把自然纹理误认为生成伪影；如果集中在某个 AI 生成源，说明该生成源的频谱分布与训练中其它源不一致。这样的分析能把“模型错了多少”进一步转化为“模型为什么错”，也使报告中的可解释性不只停留在 feature importance 条形图。
+
 \subsection{Robustness and Generalization}
 鲁棒性实验直接加载 \texttt{outputs\_v2\_full\_best} 的最佳模型，不重新训练。表~\ref{tab:robustness} 显示：\texttt{fusion\_freq} 在 clean 子集上接近满分，但 JPEG、resize 和 Gaussian noise 会显著改变高频与颜色频谱统计，从而造成预测分布偏移。旧灰度 baseline 的 clean 分数较低，但在部分 JPEG/noise 场景更稳，说明 clean 性能和 degraded 稳定性之间存在取舍。
 
@@ -218,6 +234,12 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
   \label{fig:robustness-comparison}
 \end{figure}
 
+鲁棒性结果说明，clean performance 不能直接等价为真实部署场景中的稳定性。JPEG 压缩会量化局部 DCT 系数并抑制高频细节，恰好破坏 \texttt{fusion\_freq} 中贡献较大的颜色高频和 block-DCT 统计；因此 JPEG 95 已经使二分类 F1 从 0.9908 降到 0.6607，JPEG 50 下进一步下降。缩放扰动的影响具有方向性：resize 0.5 会丢失细节并重采样高频，二分类 F1 降到 0.3671；resize 1.5 虽然也改变频谱，但保留了更多原始结构，因此二分类 F1 仍有 0.8136。高斯噪声则直接向高频区域注入随机能量，使模型学习到的“生成残差”与外加噪声混合，导致强噪声下性能明显下降。
+
+归因任务在 degraded 场景下退化更严重，这与任务定义有关。二分类只需要判断“是否 AI”，仍可能利用部分残留的通用频谱偏差；归因任务需要区分 ADM、BigGAN、VQDM 和 GLIDE 的细粒度签名，一旦 JPEG、resize 或 noise 抹平生成器间差异，类别边界就会快速变得不稳定。这个现象也是本文的重要负面结果：频域融合可以显著提升 clean 归因，但它对后处理更敏感。报告中因此不把鲁棒性实验写成“已解决”，而是作为失效模式诊断。
+
+旧灰度 baseline 在 clean 分数上远低于 \texttt{fusion\_freq}，但在部分 degraded 条件下并没有同等幅度崩溃。这说明较简单的低维灰度频谱特征可能更少依赖颜色高频细节，因而在强压缩或噪声下有时更稳。后续如果目标从课程实验转向真实平台部署，合理路线不是继续单纯提高 clean F1，而是组合三类策略：训练时加入压缩、缩放和噪声增强；测试时对多个扰动版本做特征平均或投票；在特征层降低对极高频颜色统计的依赖，增加更稳健的低/中频和 DCT 结构统计。
+
 进一步的 4-generator 扩展实验显示，\texttt{stable\_freq} 的二分类 clean F1 只有 0.8903，但 degraded 平均 F1 达到 0.6493；\texttt{fusion\_freq} full best 的二分类 clean F1 为 0.9908，但 degraded 平均 F1 为 0.5717。鲁棒训练分支 \texttt{robust\_aug} 在归因 degraded 平均 F1 上提升到 0.6347，但 clean F1 低于主模型，因此仅作为 tradeoff 分析。
 
 \begin{figure}[H]
@@ -230,8 +252,12 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
 
 留一生成器泛化实验只用三个生成源训练二分类器，并在被留出的生成源上测试。结果显示 held-out GLIDE 的 macro-F1 为 0.8877，BigGAN 为 0.7120，ADM 为 0.5696，VQDM 仅为 0.4386。这说明模型确实学习到部分通用 AIGC 指纹，但也明显依赖已见生成器的特定频谱签名。
 
+留一实验的排序也提供了对生成源差异的解释。GLIDE 被留出时仍能取得较高 F1，说明它与其余生成源共享的频谱偏差较多；VQDM 被留出时 F1 最低，说明它的频谱统计与训练中可见生成源差异较大，或更容易与真实图像统计接近。这个结果提醒我们，四生成源 clean 测试上的高分并不能自动推广到未见生成器。若要扩展为更严格的 benchmark，应补齐 Midjourney、Wukong、Stable Diffusion V1.4/V1.5 等生成源，并把“训练可见生成器、测试未见生成器”作为主要评价协议之一。
+
 \subsection{Confidence and Rejection}
 置信度分析导出预测概率、margin 与 entropy，并计算 coverage-accuracy 曲线。二分类任务中 BigGAN 的准确率最高，为 0.9953，ADM 与 VQDM 的平均置信度较低；归因任务中 ADM 的准确率最低，为 0.9973。这与错误分析一致：ADM/VQDM 是最主要的系统性混淆来源。拒识曲线表明，若允许模型在低置信度样本上输出“不确定”，高覆盖率下仍能保留较高准确率，因此 confidence 可以作为实际部署时的风险控制信号。
+
+置信度分析的作用不是继续提高分数，而是为模型可信度提供可操作的解释。在实际应用中，检测器不一定必须对每张图片给出二元结论；当 margin 较小或 entropy 较高时，可以把样本交给人工复核或更强的深度模型。本文导出的 low-confidence list 和 high-confidence wrong list 可以帮助定位两类风险：前者代表模型本身不确定的边界样本，后者代表模型非常自信但判断错误的系统性盲区。对于课程项目，这部分补充了从“模型准确”到“模型何时不可靠”的分析链条。
 
 \begin{figure}[H]
   \centering
@@ -245,7 +271,11 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
 \section{Discussion}
 实验结果显示，AIGC 图像与真实图像在频率域中存在强可分模式。尤其是颜色频谱、多尺度功率谱和残差频谱，使浅层模型在四生成源 clean validation 中接近饱和。由于模型特征具有明确物理含义，feature importance、混淆矩阵和频谱示例可以解释模型关注的频段和通道。
 
-局限性同样明确。第一，本文只使用 GenImage 四个生成源，不声明完整 GenImage benchmark。第二，模型是浅层频域检测器，不与大规模深度检测器竞争 SOTA。第三，degraded evaluation 表明强 JPEG、缩放和噪声会破坏当前最有效的高频/颜色指纹。如果后续目标是部署到真实社交媒体图像，应进一步研究训练时扰动增强、测试时增强、低中频稳健特征融合或跨生成器域泛化。
+从课程要求看，本项目覆盖了“检测、归因、鲁棒性和解释”四个核心面。检测层面，二分类任务验证频谱统计能否区分 AI 与真实图像；归因层面，四分类任务检验不同生成算法是否具有独特频谱签名；鲁棒性层面，JPEG、resize 和 noise 说明哪些指纹容易被后处理破坏；解释层面，feature importance、频谱示例和错误分析给出模型为什么有效、又在哪些样本上失败。与端到端深度检测器相比，这种流程的优势是可拆解：每个分数都能回溯到具体频段、通道或残差统计，而不是只给出一个黑盒预测。
+
+但局限性同样明确。第一，本文只使用 GenImage 四个生成源，不声明完整 GenImage benchmark。四个生成源足以支撑课程第五题的主要目标，但不能代表全部生成模型，尤其不能覆盖最新文生图系统和真实社交媒体压缩链路。第二，模型是浅层频域检测器，不与大规模深度检测器竞争 SOTA。它牺牲了语义理解和复杂空间模式建模能力，换取轻量、可解释和易复现。第三，degraded evaluation 表明强 JPEG、缩放和噪声会破坏当前最有效的高频/颜色指纹，说明频谱检测器可能被简单后处理削弱。第四，留一生成器实验显示模型仍依赖已见生成器的特定签名，跨生成器泛化没有完全解决。
+
+因此后续提升应从三个方向展开。第一，数据层面补齐 GenImage 的其余生成源，并增加真实平台下载图像，构造更接近部署场景的压缩与缩放分布。第二，特征层面研究稳健频谱表示，例如低/中频 band ratio、JPEG 不变量、跨尺度一致性和颜色通道归一化，减少对极高频细节的依赖。第三，模型层面可以在保持可解释性的前提下做集成：用 \texttt{fusion\_freq} 负责 clean 高分，用 \texttt{stable\_freq} 或灰度频谱负责 degraded 稳定性，再通过置信度或校准模型选择输出。若允许加入深度模型，也应把 CNN/ViT 作为对照，而不是替代本文的频域解释主线。
 
 \section{Conclusion}
 本文将 AIGC 图像检测转化为可解释的频域统计挖掘问题。最终 \texttt{fusion\_freq} full 模型在 clean validation 上达到二分类 macro-F1 0.9913 和归因 macro-F1 0.9991，显著超过早期灰度 FFT/DCT baseline。扩展实验进一步指出，clean 性能、鲁棒性与跨生成器泛化之间存在明显权衡：频谱融合特征可以大幅提升检测能力，但对后处理扰动敏感。该结论为课程项目提供了检测、归因、解释、鲁棒性诊断和可信度分析的完整闭环。

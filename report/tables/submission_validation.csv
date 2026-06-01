@@ -20,8 +20,8 @@ dataset,glide/train/ai,PASS,162000 images
 dataset,glide/train/nature,PASS,162000 images
 dataset,glide/val/ai,PASS,6000 images
 dataset,glide/val/nature,PASS,6000 images
-report,report/main.tex,PASS,20683 bytes
-report,report/main.pdf,PASS,5146982 bytes
+report,report/main.tex,PASS,31268 bytes
+report,report/main.pdf,PASS,5181451 bytes
 report,report/references.bib,PASS,893 bytes
 report,report/tables/optimization_v2_summary.csv,PASS,5365 bytes
 report,report/tables/robustness_comparison.csv,PASS,28510 bytes
@@ -30,7 +30,7 @@ report,report/figures/optimization_v2_macro_f1.png,PASS,139239 bytes
 report,report/figures/robustness_comparison_binary_ai_vs_nature.png,PASS,241559 bytes
 report,report/figures/robustness_comparison_ai_subsource_attribution.png,PASS,242387 bytes
 report,report/figures/feature_importance_binary_ai_vs_nature_top20.png,PASS,203366 bytes
-report,pdf page count,PASS,"5 pages, max 7"
+report,pdf page count,PASS,"7 pages, max 7"
 notebook,valid JSON,PASS,"25 cells, 13 code cells"
 results,primary output,PASS,outputs_v2_full_best
 results,binary macro-F1,PASS,0.991250
