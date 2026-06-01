@@ -8,6 +8,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{array}
+\usepackage{float}
 
 \AtBeginDocument{%
   \providecommand\BibTeX{{Bib\TeX}}%
@@ -43,7 +44,7 @@
 
 二分类任务合并四个生成源下的 AI 与 nature 图像，标签为 \texttt{ai} 和 \texttt{nature}。归因任务只使用 AI 图像，标签为 ADM、BigGAN、VQDM 和 GLIDE。抽样实验均使用分层采样和固定 seed；最终主结果使用 full 训练比例。鲁棒性评估不参与训练，只在同一个 20\% validation 子集上施加 JPEG、resize 和 Gaussian noise。
 
-\begin{table}[t]
+\begin{table}[H]
   \centering
   \caption{GenImage 四个生成源的本地数据规模。}
   \label{tab:dataset-counts}
@@ -77,7 +78,7 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
 \subsection{Clean Performance}
 表~\ref{tab:main-results} 汇总了从旧灰度 baseline 到第二轮频域融合优化的关键结果。第一轮 full baseline 的双任务平均 macro-F1 为 0.9042；引入 \texttt{fusion\_freq} 后，5\% 抽样已经达到 0.9919，full 训练比例进一步达到 0.9952。最终主结果固定为 \texttt{outputs\_v2\_full\_best}，不把后续鲁棒训练分支替代为主模型。
 
-\begin{table}[t]
+\begin{table}[H]
   \centering
   \caption{主要 clean 结果对比。}
   \label{tab:main-results}
@@ -94,55 +95,55 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
   \end{tabular}
 \end{table}
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
-  \IfFileExists{figures/optimization_v2_macro_f1.png}{\includegraphics[width=0.49\textwidth]{figures/optimization_v2_macro_f1.png}}{\fbox{missing}}
-  \IfFileExists{figures/scaleup_macro_f1.png}{\includegraphics[width=0.49\textwidth]{figures/scaleup_macro_f1.png}}{\fbox{missing}}
+  \IfFileExists{figures/optimization_v2_macro_f1.png}{\includegraphics[width=0.49\linewidth]{figures/optimization_v2_macro_f1.png}}{\fbox{missing}}
+  \IfFileExists{figures/scaleup_macro_f1.png}{\includegraphics[width=0.49\linewidth]{figures/scaleup_macro_f1.png}}{\fbox{missing}}
   \caption{第二轮频域优化和抽样比例扩大带来的 clean performance 提升。}
   \label{fig:optimization-scale}
-\end{figure*}
+\end{figure}
 
 \subsection{Single-Domain and Fused Frequency Results}
 为了区分“单一频域特征有效”与“融合频域特征更强”这两个结论，本文将第二轮特征实验拆成两类。第一类是单一或局部频域 profile：\texttt{color\_freq} 只强调 RGB/YCbCr 颜色通道频谱，\texttt{multiscale\_freq} 只强调不同 resize 尺度的功率谱，\texttt{block\_dct} 关注局部 8x8 DCT 与 JPEG-like 块结构，\texttt{residual\_freq} 关注高通、median 和 Laplacian 残差频谱。第二类是 \texttt{fusion\_freq}，它将颜色、多尺度、块 DCT 和残差频谱合并到同一个特征向量中。
 
 图~\ref{fig:single-fusion} 给出了单一频域与融合频域 profile 的直接对比。在相同 5\% 抽样下，\texttt{color\_freq} 的双任务平均 F1 约为 0.9887，是最强的单一频域 profile；\texttt{block\_dct}、\texttt{multiscale\_freq} 和 \texttt{residual\_freq} 单独使用时均明显弱于颜色频谱。融合频域在 5\% 抽样下已经达到 0.9919，full scale 后进一步达到 0.9952。这个结果说明单一频域确实含有 AIGC 指纹，但不同频域统计之间存在互补性：颜色频谱提供强判别信号，多尺度和块 DCT 描述采样/压缩痕迹，残差频谱补充局部生成噪声差异。
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
-  \IfFileExists{figures/single_vs_fusion_feature_profiles.png}{\includegraphics[width=0.68\textwidth]{figures/single_vs_fusion_feature_profiles.png}}{\fbox{missing}}
+  \IfFileExists{figures/single_vs_fusion_feature_profiles.png}{\includegraphics[width=\linewidth]{figures/single_vs_fusion_feature_profiles.png}}{\fbox{missing}}
   \caption{单一频域 profile 与融合频域 profile 的实验结果。单一频域包括颜色频谱、多尺度频谱、块 DCT 和残差频谱；融合频域将这些信号合并后在 5\% 与 full 设置下都取得更高 F1。}
   \label{fig:single-fusion}
-\end{figure*}
+\end{figure}
 
 进一步的 feature ablation 结果见图~\ref{fig:ablation-single}。在早期灰度 FFT/DCT baseline 中，\texttt{fft\_radial} 与 \texttt{no\_dct} 表现最强，说明径向功率谱已经能捕获大量真假差异；\texttt{patch\_high\_freq} 单独使用最弱，说明局部高频变化不足以单独支撑稳定检测。归因任务中也出现类似排序，表明生成源差异主要分布在全局频谱形态，而不是单一局部纹理统计。该消融图补充说明：融合频域不是简单堆叠无关特征，而是在多个有独立贡献的频谱视角上进行组合。
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
-  \IfFileExists{figures/feature_ablation_binary_ai_vs_nature.png}{\includegraphics[width=0.49\textwidth]{figures/feature_ablation_binary_ai_vs_nature.png}}{\fbox{missing}}
-  \IfFileExists{figures/feature_ablation_ai_subsource_attribution.png}{\includegraphics[width=0.49\textwidth]{figures/feature_ablation_ai_subsource_attribution.png}}{\fbox{missing}}
+  \IfFileExists{figures/feature_ablation_binary_ai_vs_nature.png}{\includegraphics[width=0.49\linewidth]{figures/feature_ablation_binary_ai_vs_nature.png}}{\fbox{missing}}
+  \IfFileExists{figures/feature_ablation_ai_subsource_attribution.png}{\includegraphics[width=0.49\linewidth]{figures/feature_ablation_ai_subsource_attribution.png}}{\fbox{missing}}
   \caption{单一频域/单组频谱特征的消融实验结果。左图为真假二分类，右图为生成源归因；径向功率谱和频带斜率贡献稳定，局部 patch 高频特征单独使用时较弱。}
   \label{fig:ablation-single}
-\end{figure*}
+\end{figure}
 
 图~\ref{fig:spectrum-examples} 展示了从原图到频谱图的可视化示例。真实图像通常具有更接近自然图像统计的径向能量衰减，而生成图像可能在高频区域、颜色通道或局部残差中出现结构化偏置。虽然单张图不能直接证明模型决策，但这种可视化能帮助解释为什么浅层频谱统计可以在不理解语义内容的情况下区分 AIGC 图像。
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
-  \IfFileExists{figures/spectrum_examples.png}{\includegraphics[width=0.92\textwidth]{figures/spectrum_examples.png}}{\fbox{missing}}
+  \IfFileExists{figures/spectrum_examples.png}{\includegraphics[width=\linewidth]{figures/spectrum_examples.png}}{\fbox{missing}}
   \caption{真实图像与不同生成源图像的频谱示例。该图用于说明频域指纹来自功率谱分布、频带能量和高频残差差异，而不是来自图像语义内容。}
   \label{fig:spectrum-examples}
-\end{figure*}
+\end{figure}
 
 图~\ref{fig:all-model-comparison} 给出更完整的实验结果总览。与单一频域 profile 相比，融合频域 profile 不仅提高了二分类，也显著提高了生成源归因；与早期灰度 baseline 相比，第二轮 \texttt{fusion\_freq} 路线的提升不是来自单个模型偶然波动，而是在多个抽样比例和多个任务上同时出现。该图也展示了鲁棒训练分支的定位：\texttt{mild\_aug} 和 \texttt{robust\_aug} 可作为鲁棒性探索，但 clean F1 不超过 full fusion 主模型。因此，最终报告采用 \texttt{outputs\_v2\_full\_best} 作为主结果，并将训练增强、stable profile 和 leave-one-generator-out 作为严谨性补充。
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
-  \IfFileExists{figures/model_comparison_macro_f1.png}{\includegraphics[width=0.92\textwidth]{figures/model_comparison_macro_f1.png}}{\fbox{missing}}
+  \IfFileExists{figures/model_comparison_macro_f1.png}{\includegraphics[width=\linewidth]{figures/model_comparison_macro_f1.png}}{\fbox{missing}}
   \caption{单一频域、融合频域、不同抽样比例和增强训练分支的整体 macro-F1 对比。该图用于补充说明最终主模型选择来自系统实验，而不是只根据单次运行决定。}
   \label{fig:all-model-comparison}
-\end{figure*}
+\end{figure}
 
-\begin{table}[t]
+\begin{table}[H]
   \centering
   \caption{单一频域 profile 与融合频域 profile 的代表性结果。}
   \label{tab:single-fusion}
@@ -162,25 +163,25 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
 
 表~\ref{tab:single-fusion} 进一步给出关键数值。可以看到，颜色频谱是最强的单一频域 profile，但仍低于同样 5\% 抽样下的融合频域。多尺度、块 DCT 和残差频谱单独使用时不一定最强，但它们提供了与颜色频谱不同的统计视角，因此在融合后能提高整体稳定性。图~\ref{fig:profile-selection} 则展示了参数和特征 profile 的筛选过程：\texttt{wide} LightGBM 在增强频谱配置中表现最好，也解释了为什么最终主路线固定为 \texttt{fusion\_freq + wide}。
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
-  \IfFileExists{figures/enhanced_feature_search_macro_f1.png}{\includegraphics[width=0.49\textwidth]{figures/enhanced_feature_search_macro_f1.png}}{\fbox{missing}}
-  \IfFileExists{figures/lgbm_tuning_binary_ai_vs_nature.png}{\includegraphics[width=0.49\textwidth]{figures/lgbm_tuning_binary_ai_vs_nature.png}}{\fbox{missing}}
+  \IfFileExists{figures/enhanced_feature_search_macro_f1.png}{\includegraphics[width=0.49\linewidth]{figures/enhanced_feature_search_macro_f1.png}}{\fbox{missing}}
+  \IfFileExists{figures/lgbm_tuning_binary_ai_vs_nature.png}{\includegraphics[width=0.49\linewidth]{figures/lgbm_tuning_binary_ai_vs_nature.png}}{\fbox{missing}}
   \caption{特征 profile 搜索与 LightGBM 参数调优结果。左图展示增强频域特征在不同 LightGBM profile 下的表现，右图展示二分类任务中的 LightGBM 调参对比。}
   \label{fig:profile-selection}
-\end{figure*}
+\end{figure}
 
 \subsection{Feature Importance and Errors}
 最终 full 模型在 48000 张二分类 validation 图像中误判 420 张，在 24000 张归因 validation 图像中误判 22 张。二分类错误更多来自 ADM 与 VQDM 的 AI 图像被判为 nature；归因错误主要集中在 ADM 与 VQDM 之间。这说明模型的主要难点不是 BigGAN 或 GLIDE，而是频谱统计更相近的生成源对。
 
-\begin{figure}[t]
+\begin{figure}[H]
   \centering
   \IfFileExists{figures/confusion_ai_subsource_attribution_lightgbm.png}{\includegraphics[width=\linewidth]{figures/confusion_ai_subsource_attribution_lightgbm.png}}{\fbox{missing}}
   \caption{最终 full 模型在生成源归因任务上的混淆矩阵。}
   \label{fig:confusion-attribution}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[H]
   \centering
   \IfFileExists{figures/feature_importance_binary_ai_vs_nature_top20.png}{\includegraphics[width=\linewidth]{figures/feature_importance_binary_ai_vs_nature_top20.png}}{\fbox{missing}}
   \caption{二分类任务中的 Top-20 频域特征重要性。}
@@ -190,7 +191,7 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
 \subsection{Robustness and Generalization}
 鲁棒性实验直接加载 \texttt{outputs\_v2\_full\_best} 的最佳模型，不重新训练。表~\ref{tab:robustness} 显示：\texttt{fusion\_freq} 在 clean 子集上接近满分，但 JPEG、resize 和 Gaussian noise 会显著改变高频与颜色频谱统计，从而造成预测分布偏移。旧灰度 baseline 的 clean 分数较低，但在部分 JPEG/noise 场景更稳，说明 clean 性能和 degraded 稳定性之间存在取舍。
 
-\begin{table}[t]
+\begin{table}[H]
   \centering
   \caption{20\% validation 上的鲁棒性诊断 macro-F1。}
   \label{tab:robustness}
@@ -209,36 +210,36 @@ baseline 特征包括 FFT 径向功率谱、角向能量、低/中/高频能量�
   \end{tabular}
 \end{table}
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
-  \IfFileExists{figures/robustness_comparison_binary_ai_vs_nature.png}{\includegraphics[width=0.49\textwidth]{figures/robustness_comparison_binary_ai_vs_nature.png}}{\fbox{missing}}
-  \IfFileExists{figures/robustness_comparison_ai_subsource_attribution.png}{\includegraphics[width=0.49\textwidth]{figures/robustness_comparison_ai_subsource_attribution.png}}{\fbox{missing}}
+  \IfFileExists{figures/robustness_comparison_binary_ai_vs_nature.png}{\includegraphics[width=0.49\linewidth]{figures/robustness_comparison_binary_ai_vs_nature.png}}{\fbox{missing}}
+  \IfFileExists{figures/robustness_comparison_ai_subsource_attribution.png}{\includegraphics[width=0.49\linewidth]{figures/robustness_comparison_ai_subsource_attribution.png}}{\fbox{missing}}
   \caption{当前 \texttt{fusion\_freq} 最佳模型与旧灰度 baseline 的 degraded validation 对照。}
   \label{fig:robustness-comparison}
-\end{figure*}
+\end{figure}
 
 进一步的 4-generator 扩展实验显示，\texttt{stable\_freq} 的二分类 clean F1 只有 0.8903，但 degraded 平均 F1 达到 0.6493；\texttt{fusion\_freq} full best 的二分类 clean F1 为 0.9908，但 degraded 平均 F1 为 0.5717。鲁棒训练分支 \texttt{robust\_aug} 在归因 degraded 平均 F1 上提升到 0.6347，但 clean F1 低于主模型，因此仅作为 tradeoff 分析。
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
-  \IfFileExists{figures/robustness_tradeoff_binary_ai_vs_nature.png}{\includegraphics[width=0.49\textwidth]{figures/robustness_tradeoff_binary_ai_vs_nature.png}}{\fbox{missing}}
-  \IfFileExists{figures/logo_generalization_macro_f1.png}{\includegraphics[width=0.49\textwidth]{figures/logo_generalization_macro_f1.png}}{\fbox{missing}}
+  \IfFileExists{figures/robustness_tradeoff_binary_ai_vs_nature.png}{\includegraphics[width=0.49\linewidth]{figures/robustness_tradeoff_binary_ai_vs_nature.png}}{\fbox{missing}}
+  \IfFileExists{figures/logo_generalization_macro_f1.png}{\includegraphics[width=0.49\linewidth]{figures/logo_generalization_macro_f1.png}}{\fbox{missing}}
   \caption{左：clean 与 degraded 平均 F1 的取舍；右：leave-one-generator-out 泛化结果。}
   \label{fig:tradeoff-logo}
-\end{figure*}
+\end{figure}
 
 留一生成器泛化实验只用三个生成源训练二分类器，并在被留出的生成源上测试。结果显示 held-out GLIDE 的 macro-F1 为 0.8877，BigGAN 为 0.7120，ADM 为 0.5696，VQDM 仅为 0.4386。这说明模型确实学习到部分通用 AIGC 指纹，但也明显依赖已见生成器的特定频谱签名。
 
 \subsection{Confidence and Rejection}
 置信度分析导出预测概率、margin 与 entropy，并计算 coverage-accuracy 曲线。二分类任务中 BigGAN 的准确率最高，为 0.9953，ADM 与 VQDM 的平均置信度较低；归因任务中 ADM 的准确率最低，为 0.9973。这与错误分析一致：ADM/VQDM 是最主要的系统性混淆来源。拒识曲线表明，若允许模型在低置信度样本上输出“不确定”，高覆盖率下仍能保留较高准确率，因此 confidence 可以作为实际部署时的风险控制信号。
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
-  \IfFileExists{figures/confidence_coverage_binary_ai_vs_nature.png}{\includegraphics[width=0.49\textwidth]{figures/confidence_coverage_binary_ai_vs_nature.png}}{\fbox{missing}}
-  \IfFileExists{figures/confidence_histogram_binary_ai_vs_nature.png}{\includegraphics[width=0.49\textwidth]{figures/confidence_histogram_binary_ai_vs_nature.png}}{\fbox{missing}}
+  \IfFileExists{figures/confidence_coverage_binary_ai_vs_nature.png}{\includegraphics[width=0.49\linewidth]{figures/confidence_coverage_binary_ai_vs_nature.png}}{\fbox{missing}}
+  \IfFileExists{figures/confidence_histogram_binary_ai_vs_nature.png}{\includegraphics[width=0.49\linewidth]{figures/confidence_histogram_binary_ai_vs_nature.png}}{\fbox{missing}}
   \caption{二分类任务的 coverage-accuracy 曲线与置信度分布。}
   \label{fig:confidence}
-\end{figure*}
+\end{figure}
 
 \vspace{-0.4em}
 \section{Discussion}
