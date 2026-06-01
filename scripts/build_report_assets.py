@@ -374,6 +374,84 @@ def save_model_comparison_plot(comparison: pd.DataFrame, figure_dir: Path) -> No
     plt.close()
 
 
+def collect_single_vs_fusion(summary: pd.DataFrame) -> pd.DataFrame:
+    if summary.empty:
+        return pd.DataFrame()
+    run_to_profile = {
+        "outputs_v2_5pct_color_freq_flat": ("color_freq", "single-domain"),
+        "outputs_v2_5pct_multiscale_freq_flat": ("multiscale_freq", "single-domain"),
+        "outputs_v2_5pct_block_dct_flat": ("block_dct", "single-domain"),
+        "outputs_v2_5pct_residual_freq_flat": ("residual_freq", "single-domain"),
+        "outputs_v2_5pct_fusion_freq_flat": ("fusion_freq", "fusion"),
+        "outputs_v2_full_best": ("fusion_freq_full", "fusion"),
+    }
+    rows = []
+    for row in summary.to_dict(orient="records"):
+        meta = run_to_profile.get(str(row["run"]))
+        if meta is None:
+            continue
+        profile, family = meta
+        rows.append(
+            {
+                "profile": profile,
+                "family": family,
+                "task": row["task"],
+                "sample_fraction": 1.0 if row["run"] == "outputs_v2_full_best" else 0.05,
+                "macro_f1": row["macro_f1"],
+                "accuracy": row["accuracy"],
+                "auc": row["auc"],
+                "run": row["run"],
+            }
+        )
+    if not rows:
+        return pd.DataFrame()
+    order = {
+        "color_freq": 0,
+        "multiscale_freq": 1,
+        "block_dct": 2,
+        "residual_freq": 3,
+        "fusion_freq": 4,
+        "fusion_freq_full": 5,
+    }
+    df = pd.DataFrame(rows)
+    df["profile_order"] = df["profile"].map(order)
+    return df.sort_values(["profile_order", "task"]).drop(columns=["profile_order"]).reset_index(drop=True)
+
+
+def save_single_vs_fusion_plot(single_vs_fusion: pd.DataFrame, figure_dir: Path) -> None:
+    if single_vs_fusion.empty:
+        return
+    df = single_vs_fusion.copy()
+    task_labels = {
+        "binary_ai_vs_nature": "AI vs Nature",
+        "ai_subsource_attribution": "Attribution",
+    }
+    df["task_label"] = df["task"].map(task_labels).fillna(df["task"])
+    df["profile_label"] = df["profile"].map(
+        {
+            "color_freq": "Color",
+            "multiscale_freq": "Multi-scale",
+            "block_dct": "Block DCT",
+            "residual_freq": "Residual",
+            "fusion_freq": "Fusion 5%",
+            "fusion_freq_full": "Fusion full",
+        }
+    )
+    pivot = df.pivot_table(index="profile_label", columns="task_label", values="macro_f1", aggfunc="first")
+    order = ["Color", "Multi-scale", "Block DCT", "Residual", "Fusion 5%", "Fusion full"]
+    pivot = pivot.reindex([x for x in order if x in pivot.index])
+    ax = pivot.plot(kind="bar", figsize=(8.8, 4.4), ylim=(0.75, 1.01), width=0.75)
+    ax.set_xlabel("Feature profile")
+    ax.set_ylabel("Macro-F1")
+    ax.set_title("Single-domain frequency profiles vs fused frequency profile")
+    ax.grid(axis="y", linestyle="--", alpha=0.35)
+    ax.legend(title="Task", loc="lower right")
+    plt.xticks(rotation=20, ha="right")
+    plt.tight_layout()
+    plt.savefig(figure_dir / "single_vs_fusion_feature_profiles.png", dpi=220)
+    plt.close()
+
+
 def save_ablation_plot(ablation: pd.DataFrame, figure_dir: Path) -> None:
     if ablation.empty:
         return
@@ -774,6 +852,10 @@ def main() -> None:
     summary.to_csv(table_dir / "experiment_summary.csv", index=False)
     comparison.to_csv(table_dir / "model_comparison_long.csv", index=False)
     save_model_comparison_plot(comparison, figure_dir)
+    single_vs_fusion = collect_single_vs_fusion(summary)
+    if not single_vs_fusion.empty:
+        single_vs_fusion.to_csv(table_dir / "single_vs_fusion_profiles.csv", index=False)
+        save_single_vs_fusion_plot(single_vs_fusion, figure_dir)
     save_logo_generalization(collect_logo_generalization(outputs), figure_dir, table_dir)
     seed_stability = collect_seed_stability(summary)
     if not seed_stability.empty:
