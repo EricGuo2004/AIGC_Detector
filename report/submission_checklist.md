@@ -29,7 +29,7 @@
 | dataset | glide/val/ai | PASS | 6000 images |
 | dataset | glide/val/nature | PASS | 6000 images |
 | report | report/main.tex | PASS | 20694 bytes |
-| report | report/main.pdf | PASS | 5114991 bytes |
+| report | report/main.pdf | PASS | 5147642 bytes |
 | report | report/references.bib | PASS | 893 bytes |
 | report | report/tables/optimization_v2_summary.csv | PASS | 5365 bytes |
 | report | report/tables/robustness_comparison.csv | PASS | 28510 bytes |
@@ -54,10 +54,8 @@
 | robustness | baseline ai_subsource_attribution rows | PASS | 10 rows, clean=0.904850 |
 | git | large/local directories excluded | PASS | ok |
 | git | working tree status | WARN | M notebooks/final_project_aigc_detector.ipynb
- M report/figures/optimization_v2_macro_f1.png
+ M report/figures/scaleup_macro_f1.png
  M report/main.pdf
- M report/main.tex
- M report/tables/optimization_v2_summary.csv
- M scripts/build_optimization_v2_assets.py
+ M scripts/build_report_assets.py
 ?? docs/PART_A_PRESENTATION_PACKAGE.md
 ?? docs/PRESENTATION_10MIN_SCRIPT.md |
