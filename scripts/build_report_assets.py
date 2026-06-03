@@ -99,6 +99,23 @@ def run_label(run: str) -> str:
     return RUN_LABELS.get(run, run.replace("outputs_", "").replace("_", " "))
 
 
+def wrap_label(label: str, width: int = 18) -> str:
+    words = str(label).replace("_", " ").split()
+    lines: list[str] = []
+    current: list[str] = []
+    for word in words:
+        candidate = " ".join([*current, word]) if current else word
+        if len(candidate) <= width:
+            current.append(word)
+        else:
+            if current:
+                lines.append(" ".join(current))
+            current = [word]
+    if current:
+        lines.append(" ".join(current))
+    return "\n".join(lines)
+
+
 def save_plot(path: Path) -> None:
     plt.tight_layout()
     plt.savefig(path, dpi=240, facecolor="white")
@@ -778,16 +795,68 @@ def save_robustness_tradeoff(df: pd.DataFrame, figure_dir: Path, table_dir: Path
         return
     tradeoff.to_csv(table_dir / "robustness_tradeoff.csv", index=False)
     for task, group in tradeoff.groupby("task"):
-        fig, ax = plt.subplots(figsize=(5.6, 4.4))
-        for _, row in group.iterrows():
-            ax.scatter(row["clean_macro_f1"], row["degraded_mean_macro_f1"], s=72, color=SERIES_COLORS[len(ax.collections) % len(SERIES_COLORS)], edgecolor="white", linewidth=0.8)
-            ax.text(row["clean_macro_f1"] + 0.005, row["degraded_mean_macro_f1"], str(row["run"]), fontsize=8)
-        ax.set_xlim(0, 1.05)
-        ax.set_ylim(0, 1.05)
-        ax.set_xlabel("Clean Macro-F1")
-        ax.set_ylabel("Degraded 平均 Macro-F1")
-        ax.set_title(f"Clean vs degraded tradeoff / 取舍：{task_label(task)}")
-        polish_axes(ax)
+        group = group.copy()
+        group["label"] = group["run"].map(run_label)
+        group = group.sort_values("clean_minus_degraded_mean", ascending=False).reset_index(drop=True)
+        y = np.arange(len(group))
+        fig, ax = plt.subplots(figsize=(7.2, max(4.2, 0.62 * len(group) + 1.45)))
+        for idx, row in group.iterrows():
+            ax.hlines(
+                y=idx,
+                xmin=row["degraded_mean_macro_f1"],
+                xmax=row["clean_macro_f1"],
+                color="#b8c0bd",
+                linewidth=2.2,
+                zorder=1,
+            )
+        ax.scatter(
+            group["clean_macro_f1"],
+            y,
+            s=86,
+            color=STYLE["blue"],
+            edgecolor="white",
+            linewidth=0.9,
+            label="Clean",
+            zorder=3,
+        )
+        ax.scatter(
+            group["degraded_mean_macro_f1"],
+            y,
+            s=86,
+            color=STYLE["orange"],
+            edgecolor="white",
+            linewidth=0.9,
+            label="Degraded mean",
+            zorder=3,
+        )
+        ax.scatter(
+            group["degraded_min_macro_f1"],
+            y,
+            s=48,
+            marker="x",
+            linewidth=1.6,
+            color=STYLE["rose"],
+            label="Worst degraded",
+            zorder=4,
+        )
+        for idx, row in group.iterrows():
+            ax.text(
+                min(1.01, row["clean_macro_f1"] + 0.012),
+                idx,
+                f"drop {row['clean_minus_degraded_mean']:.2f}",
+                va="center",
+                fontsize=8,
+                color="#5e6b73",
+            )
+        ax.set_xlim(0.05, 1.08)
+        ax.set_yticks(y)
+        ax.set_yticklabels([wrap_label(label, 20) for label in group["label"]], fontsize=8.5)
+        ax.invert_yaxis()
+        ax.set_xlabel("Macro-F1")
+        ax.set_ylabel("")
+        ax.set_title(f"Clean vs degraded robustness tradeoff: {task_label(task)}")
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.16), frameon=False, ncol=3, fontsize=8)
+        polish_axes(ax, grid_axis="x")
         save_plot(figure_dir / f"robustness_tradeoff_{task}.png")
 
 
@@ -855,29 +924,65 @@ def save_confidence_assets(primary: Path, figure_dir: Path, table_dir: Path) -> 
         if coverage_path.exists():
             coverage = pd.read_csv(coverage_path)
             coverage.to_csv(table_dir / f"confidence_coverage_{task}.csv", index=False)
+            plot_cov = coverage.dropna(subset=["coverage", "accuracy", "macro_f1"]).copy()
+            plot_cov = plot_cov[plot_cov["coverage"] >= 0.78]
+            if plot_cov.empty:
+                plot_cov = coverage.dropna(subset=["coverage", "accuracy", "macro_f1"]).copy()
             fig, ax1 = plt.subplots(figsize=(6.4, 4.2))
-            ax1.plot(coverage["coverage"], coverage["accuracy"], label="Accuracy", color=STYLE["blue"], linewidth=2.0)
-            ax1.plot(coverage["coverage"], coverage["macro_f1"], label="Macro-F1", color=STYLE["orange"], linewidth=2.0)
-            ax1.set_xlim(1.02, -0.02)
-            ax1.set_ylim(0, 1.05)
-            ax1.set_xlabel("拒识低置信度样本后的 coverage")
-            ax1.set_ylabel("保留样本得分")
-            ax1.set_title(f"Coverage-accuracy / 置信度拒识：{task_label(task)}")
-            ax1.legend(loc="lower left")
+            ax1.plot(plot_cov["coverage"], plot_cov["macro_f1"], label="Macro-F1", color=STYLE["orange"], linewidth=2.6, zorder=2)
+            ax1.plot(
+                plot_cov["coverage"],
+                plot_cov["accuracy"],
+                label="Accuracy",
+                color=STYLE["blue"],
+                linewidth=2.2,
+                linestyle=(0, (3, 2)),
+                marker="o",
+                markevery=max(1, len(plot_cov) // 8),
+                markersize=3.2,
+                zorder=3,
+            )
+            anchor_rows = plot_cov[plot_cov["coverage"].isin([plot_cov["coverage"].max(), plot_cov["coverage"].min()])]
+            if not anchor_rows.empty:
+                ax1.scatter(anchor_rows["coverage"], anchor_rows["macro_f1"], color=STYLE["orange"], s=28, zorder=4)
+            ymin = max(0.95, float(plot_cov[["accuracy", "macro_f1"]].min().min()) - 0.004)
+            ymax = min(1.002, float(plot_cov[["accuracy", "macro_f1"]].max().max()) + 0.002)
+            if ymax - ymin < 0.01:
+                ymin = max(0.0, ymax - 0.02)
+            ax1.set_xlim(1.005, max(0.78, float(plot_cov["coverage"].min()) - 0.01))
+            ax1.set_ylim(ymin, ymax)
+            ax1.set_xlabel("Coverage after rejecting low-confidence samples")
+            ax1.set_ylabel("Score on retained samples")
+            ax1.set_title(f"Confidence rejection curve: {task_label(task)}")
+            ax1.legend(loc="lower left", frameon=False)
+            ax1.text(0.99, ymax - 0.08 * (ymax - ymin), "Zoomed y-axis", fontsize=8, color="#5e6b73", ha="right")
             polish_axes(ax1)
             save_plot(figure_dir / f"confidence_coverage_{task}.png")
         if details_path.exists():
             details = pd.read_csv(details_path)
             details.to_csv(table_dir / f"confidence_details_{task}.csv", index=False)
-            fig, ax = plt.subplots(figsize=(6.2, 4.0))
+            fig, ax = plt.subplots(figsize=(6.4, 4.2))
+            bins = np.linspace(0.5, 1.0, 42)
             for correct, group in details.groupby("correct"):
-                label = "correct" if bool(correct) else "wrong"
+                label = "Correct" if bool(correct) else "Wrong"
                 color = STYLE["green"] if bool(correct) else STYLE["rose"]
-                ax.hist(group["confidence"], bins=30, alpha=0.72, label=label, color=color)
-            ax.set_xlabel("预测置信度")
-            ax.set_ylabel("样本数")
-            ax.set_title(f"Confidence distribution / 置信度分布：{task_label(task)}")
-            ax.legend()
+                ax.hist(
+                    group["confidence"],
+                    bins=bins,
+                    alpha=0.64 if bool(correct) else 0.82,
+                    label=f"{label} (n={len(group):,})",
+                    color=color,
+                    edgecolor="white",
+                    linewidth=0.45,
+                    log=True,
+                )
+                median = float(group["confidence"].median())
+                ax.axvline(median, color=color, linestyle="--", linewidth=1.4, alpha=0.9)
+            ax.set_xlim(0.5, 1.0)
+            ax.set_xlabel("Predicted confidence")
+            ax.set_ylabel("Sample count (log scale)")
+            ax.set_title(f"Confidence distribution: {task_label(task)}")
+            ax.legend(frameon=False, loc="upper left")
             polish_axes(ax)
             save_plot(figure_dir / f"confidence_histogram_{task}.png")
         if by_generator_path.exists():

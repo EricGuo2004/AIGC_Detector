@@ -54,10 +54,24 @@
 | robustness | baseline ai_subsource_attribution rows | PASS | 10 rows, clean=0.904850 |
 | git | large/local directories excluded | PASS | ok |
 | git | working tree status | WARN | M notebooks/final_project_aigc_detector.ipynb
- M report/submission_checklist.md
- M report/tables/submission_validation.csv
+ M report/figures/confidence_coverage_ai_subsource_attribution.png
+ M report/figures/confidence_coverage_binary_ai_vs_nature.png
+ M report/figures/confidence_histogram_ai_subsource_attribution.png
+ M report/figures/confidence_histogram_binary_ai_vs_nature.png
+ M report/figures/robustness_tradeoff_ai_subsource_attribution.png
+ M report/figures/robustness_tradeoff_binary_ai_vs_nature.png
+ M scripts/analyze_v2_error_bottlenecks.py
+ M scripts/build_optimization_v2_assets.py
+ M scripts/build_report_assets.py
+ M scripts/evaluate_best_robustness.py
  M scripts/validate_submission.py
+ M src/features.py
+ M src/robustness.py
+ M src/training.py
 ?? docs/PART_A_PRESENTATION_PACKAGE.md
 ?? docs/PRESENTATION_10MIN_SCRIPT.md
+?? notebooks/requirements.txt
+?? notebooks/test.py
+?? notebooks/train.py
 ?? "report/\346\226\260\345\273\272\346\226\207\344\273\266\345\244\271.zip"
 ?? "report/\346\226\260\345\273\272\346\226\207\344\273\266\345\244\271/" |
