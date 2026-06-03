@@ -65,7 +65,7 @@
 本文围绕三个问题展开：RQ1，FFT/DCT 等频谱统计能否区分 AI 图像与真实图像；RQ2，频谱特征能否识别生成源；RQ3，JPEG、缩放和噪声扰动会怎样破坏或保留频谱指纹。我们的贡献包括：构建四生成源 GenImage 频谱检测流程；比较 baseline、调参、scale-up 和频域增强路线；加入跨生成器泛化、鲁棒性诊断、置信度拒识和错误模式分析；最终形成一个轻量、可解释、可复现的 AIGC 检测闭环。
 
 \section{Dataset and Protocol}
-本文使用 GenImage 数据集~\cite{zhu2023genimage} 中四个生成源子集：ADM、BigGAN、VQDM 和 GLIDE。数据根目录为 \texttt{C:\textbackslash Users\textbackslash 99303\textbackslash git\textbackslash GenImage\_data}。每个生成源都包含 \texttt{train/ai}、\texttt{train/nature}、\texttt{val/ai} 和 \texttt{val/nature}。实验中 \texttt{train} 用于训练，\texttt{val} 作为测试集。
+本文使用 GenImage 数据集~\cite{zhu2023genimage} 中四个生成源子集：ADM、BigGAN、VQDM 和 GLIDE。数据根目录在代码中通过 \texttt{--dataset-root} 或环境变量 \texttt{GENIMAGE\_DATA\_ROOT} 指定，提交材料中统一记为 \texttt{PATH\_TO\_GenImage\_data}。每个生成源都包含 \texttt{train/ai}、\texttt{train/nature}、\texttt{val/ai} 和 \texttt{val/nature}。实验中 \texttt{train} 用于训练，\texttt{val} 作为测试集。
 
 二分类任务合并四个生成源下的 AI 与 nature 图像，标签为 \texttt{ai} 和 \texttt{nature}。归因任务只使用 AI 图像，标签为 ADM、BigGAN、VQDM 和 GLIDE。抽样实验均使用分层采样和固定 seed；最终主结果使用 full 训练比例。鲁棒性评估不参与训练，只在同一个 20\% validation 子集上施加 JPEG、resize 和 Gaussian noise。
 

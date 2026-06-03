@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import math
 import sys
 from pathlib import Path
@@ -33,7 +34,7 @@ TASKS = ("binary_ai_vs_nature", "ai_subsource_attribution")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Analyze confidence, rejection, and high-confidence errors.")
-    parser.add_argument("--dataset-root", default=r"C:\Users\99303\git\GenImage_data")
+    parser.add_argument("--dataset-root", default=os.environ.get("GENIMAGE_DATA_ROOT", "data/GenImage_data"))
     parser.add_argument("--output-dir", default="outputs_v2_full_best", help="Experiment output containing best_model.joblib.")
     parser.add_argument("--tasks", nargs="*", choices=[*TASKS, "both"], default=["both"])
     parser.add_argument("--sample-fraction", type=float, default=1.0)

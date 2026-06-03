@@ -1,21 +1,21 @@
 area,name,status,detail
-dataset,dataset root,PASS,C:\Users\99303\git\GenImage_data
-dataset,ADM root,PASS,C:\Users\99303\git\GenImage_data\ADM
+dataset,dataset root,PASS,PATH_TO_GenImage_data
+dataset,ADM root,PASS,PATH_TO_GenImage_data\ADM
 dataset,ADM/train/ai,PASS,162000 images
 dataset,ADM/train/nature,PASS,157453 images
 dataset,ADM/val/ai,PASS,6000 images
 dataset,ADM/val/nature,PASS,6000 images
-dataset,BigGAN root,PASS,C:\Users\99303\git\GenImage_data\BigGAN
+dataset,BigGAN root,PASS,PATH_TO_GenImage_data\BigGAN
 dataset,BigGAN/train/ai,PASS,162000 images
 dataset,BigGAN/train/nature,PASS,162000 images
 dataset,BigGAN/val/ai,PASS,6000 images
 dataset,BigGAN/val/nature,PASS,6000 images
-dataset,VQDM root,PASS,C:\Users\99303\git\GenImage_data\VQDM
+dataset,VQDM root,PASS,PATH_TO_GenImage_data\VQDM
 dataset,VQDM/train/ai,PASS,162000 images
 dataset,VQDM/train/nature,PASS,162000 images
 dataset,VQDM/val/ai,PASS,6000 images
 dataset,VQDM/val/nature,PASS,6000 images
-dataset,glide root,PASS,C:\Users\99303\git\GenImage_data\glide
+dataset,glide root,PASS,PATH_TO_GenImage_data\glide
 dataset,glide/train/ai,PASS,162000 images
 dataset,glide/train/nature,PASS,162000 images
 dataset,glide/val/ai,PASS,6000 images

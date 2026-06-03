@@ -90,7 +90,7 @@ AI 图像表面上越来越像真实照片，但生成过程往往和相机拍�
 README 推荐把 GenImage 原始数据放在仓库外，例如：
 
 ```text
-C:\Users\99303\git\GenImage_data\
+PATH_TO_GenImage_data\
   ADM\
     train\ai
     train\nature
@@ -350,7 +350,7 @@ python -m venv .venv
 
 ```powershell
 .\.venv\Scripts\python.exe test.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --out-dir outputs_smoke_min `
   --sample-fraction 0.001 `
   --skip-robustness
@@ -369,7 +369,7 @@ python -m venv .venv
 
 ```powershell
 .\.venv\Scripts\python.exe test.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --out-dir outputs_v2_full_best `
   --sample-fraction 1.0 `
   --sample-seed 42 `
@@ -409,7 +409,7 @@ python -m venv .venv
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\evaluate_best_robustness.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --model-output outputs_v2_full_best `
   --out-dir outputs_v2_full_best_robust_20pct `
   --sample-fraction 0.20 `
@@ -426,7 +426,7 @@ python -m venv .venv
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\build_report_assets.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --report-dir report `
   --primary-output outputs_v2_full_best `
   --robustness-output outputs_v2_full_best_robust_20pct `
@@ -530,7 +530,7 @@ outputs_v2_full_best/
 
 ### 1. 数据路径不对怎么办？
 
-先确认路径下是否有 `ADM/train/ai` 这样的结构。代码只认 `train/ai`、`train/nature`、`val/ai`、`val/nature`。如果默认 `data` 无效，`train.py` 和 `test.py` 会尝试 fallback 到当前目录或脚本目录，但正式运行建议显式传 `--dataset-root C:\Users\99303\git\GenImage_data`。
+先确认路径下是否有 `ADM/train/ai` 这样的结构。代码只认 `train/ai`、`train/nature`、`val/ai`、`val/nature`。如果默认 `data` 无效，`train.py` 和 `test.py` 会尝试 fallback 到当前目录或脚本目录，但正式运行建议显式传 `--dataset-root PATH_TO_GenImage_data`。
 
 ### 2. 为什么显示没有找到图片？
 

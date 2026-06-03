@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import csv
 import json
 import re
@@ -27,7 +28,7 @@ class Check:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate final AIGC_Detector submission assets.")
-    parser.add_argument("--dataset-root", default=r"C:\Users\99303\git\GenImage_data")
+    parser.add_argument("--dataset-root", default=os.environ.get("GENIMAGE_DATA_ROOT", "data/GenImage_data"))
     parser.add_argument("--report-dir", default="report")
     parser.add_argument("--primary-output", default="outputs_v2_full_best")
     parser.add_argument("--robustness-output", default="outputs_v2_full_best_robust_20pct")

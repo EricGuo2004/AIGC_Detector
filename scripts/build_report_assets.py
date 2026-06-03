@@ -107,7 +107,7 @@ def save_plot(path: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build report CSV/PNG assets from AIGC_Detector outputs.")
-    parser.add_argument("--dataset-root", default=r"C:\Users\99303\git\GenImage_data")
+    parser.add_argument("--dataset-root", default=os.environ.get("GENIMAGE_DATA_ROOT", "data/GenImage_data"))
     parser.add_argument("--report-dir", default="report")
     parser.add_argument(
         "--outputs",
