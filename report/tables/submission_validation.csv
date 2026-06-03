@@ -21,7 +21,7 @@ dataset,glide/train/nature,PASS,162000 images
 dataset,glide/val/ai,PASS,6000 images
 dataset,glide/val/nature,PASS,6000 images
 report,report/main.tex,PASS,42584 bytes
-report,report/main.pdf,PASS,5206992 bytes
+report,report/main.pdf,PASS,5243244 bytes
 report,report/references.bib,PASS,893 bytes
 report,report/tables/optimization_v2_summary.csv,PASS,5365 bytes
 report,report/tables/robustness_comparison.csv,PASS,28510 bytes
@@ -45,25 +45,8 @@ robustness,baseline output,PASS,outputs_4gen_full_best_robust_20pct
 robustness,baseline binary_ai_vs_nature rows,PASS,"10 rows, clean=0.894157"
 robustness,baseline ai_subsource_attribution rows,PASS,"10 rows, clean=0.904850"
 git,large/local directories excluded,PASS,ok
-git,working tree status,WARN,"M notebooks/final_project_aigc_detector.ipynb
- M report/figures/confidence_coverage_ai_subsource_attribution.png
- M report/figures/confidence_coverage_binary_ai_vs_nature.png
- M report/figures/confidence_histogram_ai_subsource_attribution.png
- M report/figures/confidence_histogram_binary_ai_vs_nature.png
- M report/figures/robustness_tradeoff_ai_subsource_attribution.png
- M report/figures/robustness_tradeoff_binary_ai_vs_nature.png
- M scripts/analyze_v2_error_bottlenecks.py
- M scripts/build_optimization_v2_assets.py
- M scripts/build_report_assets.py
- M scripts/evaluate_best_robustness.py
- M scripts/validate_submission.py
- M src/features.py
- M src/robustness.py
- M src/training.py
+git,working tree status,WARN,"M report/main.pdf
 ?? docs/PART_A_PRESENTATION_PACKAGE.md
 ?? docs/PRESENTATION_10MIN_SCRIPT.md
-?? notebooks/requirements.txt
-?? notebooks/test.py
-?? notebooks/train.py
 ?? ""report/\346\226\260\345\273\272\346\226\207\344\273\266\345\244\271.zip""
 ?? ""report/\346\226\260\345\273\272\346\226\207\344\273\266\345\244\271/"""
