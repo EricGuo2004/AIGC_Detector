@@ -34,7 +34,7 @@ Do not commit GenImage data to GitHub. Put it outside the repository, for
 example:
 
 ```text
-C:\Users\99303\git\GenImage_data\
+PATH_TO_GenImage_data\
   ADM\
     train\ai
     train\nature
@@ -64,7 +64,7 @@ Quick smoke test:
 
 ```powershell
 .\.venv\Scripts\python.exe test.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --out-dir outputs_smoke_min `
   --sample-fraction 0.001 `
   --skip-robustness
@@ -74,7 +74,7 @@ Re-run the current best clean route:
 
 ```powershell
 .\.venv\Scripts\python.exe test.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --out-dir outputs_v2_full_best `
   --sample-fraction 1.0 `
   --sample-seed 42 `
@@ -98,7 +98,7 @@ Evaluate robustness for the saved best model without retraining:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\evaluate_best_robustness.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --model-output outputs_v2_full_best `
   --out-dir outputs_v2_full_best_robust_20pct `
   --sample-fraction 0.20 `
@@ -113,7 +113,7 @@ Build report assets:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\build_report_assets.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --report-dir report `
   --primary-output outputs_v2_full_best `
   --robustness-output outputs_v2_full_best_robust_20pct `
@@ -135,7 +135,7 @@ Run the extension suite at 20% sampling:
 
 ```powershell
 .\scripts\run_4gen_extension_suite.ps1 `
-  -DatasetRoot C:\Users\99303\git\GenImage_data `
+  -DatasetRoot PATH_TO_GenImage_data `
   -LightgbmDevice gpu `
   -LogoFraction 0.20 `
   -CandidateFraction 0.20
@@ -153,7 +153,7 @@ Individual commands are also available:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\run_logo_generalization.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --out-dir outputs_4gen_logo_20pct_fusion `
   --sample-fraction 0.20 `
   --feature-profile fusion_freq `
@@ -167,7 +167,7 @@ Individual commands are also available:
   --resume-completed
 
 .\.venv\Scripts\python.exe scripts\analyze_confidence_rejection.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --output-dir outputs_v2_full_best `
   --tasks both `
   --sample-fraction 1.0 `
@@ -178,7 +178,7 @@ Validate the final submission loop:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\validate_submission.py `
-  --dataset-root C:\Users\99303\git\GenImage_data `
+  --dataset-root PATH_TO_GenImage_data `
   --write-report
 ```
 

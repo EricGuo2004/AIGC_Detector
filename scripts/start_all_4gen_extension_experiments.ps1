@@ -1,5 +1,5 @@
 param(
-  [string]$DatasetRoot = "C:\Users\99303\git\GenImage_data",
+  [string]$DatasetRoot = $(if ($env:GENIMAGE_DATA_ROOT) { $env:GENIMAGE_DATA_ROOT } else { "data\GenImage_data" }),
   [ValidateSet("cpu", "gpu")]
   [string]$LightgbmDevice = "gpu",
   [int]$NumWorkers = 16,

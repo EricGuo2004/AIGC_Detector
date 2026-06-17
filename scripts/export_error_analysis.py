@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import warnings
 from pathlib import Path
@@ -27,7 +28,7 @@ from train import _load_feature_cache, feature_cache_path  # noqa: E402
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Export prediction details and mistakes for a saved experiment.")
-    parser.add_argument("--dataset-root", default=r"C:\Users\99303\git\GenImage_data")
+    parser.add_argument("--dataset-root", default=os.environ.get("GENIMAGE_DATA_ROOT", "data/GenImage_data"))
     parser.add_argument("--output-dir", required=True, help="Experiment output directory, e.g. outputs_4gen_1pct")
     parser.add_argument("--task", choices=["binary_ai_vs_nature", "ai_subsource_attribution"], required=True)
     parser.add_argument("--sample-fraction", type=float, required=True)

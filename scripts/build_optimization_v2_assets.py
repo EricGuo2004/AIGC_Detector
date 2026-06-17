@@ -13,6 +13,75 @@ import pandas as pd
 
 
 TASKS = ("binary_ai_vs_nature", "ai_subsource_attribution")
+STYLE = {
+    "ink": "#1c2a3b",
+    "green": "#66a38a",
+    "orange": "#c9823a",
+    "plum": "#7f3a58",
+    "blue": "#4f77b6",
+    "grid": "#d9ddd8",
+    "paper": "#fbfbf8",
+}
+OLD_FULL_BASELINE = 0.9041572078758394
+
+
+def apply_ppt_style() -> None:
+    plt.rcParams.update(
+        {
+            "font.sans-serif": ["Microsoft YaHei", "SimHei", "SimSun", "Arial Unicode MS", "DejaVu Sans"],
+            "axes.unicode_minus": False,
+            "figure.facecolor": "white",
+            "axes.facecolor": STYLE["paper"],
+            "axes.edgecolor": STYLE["ink"],
+            "axes.labelcolor": STYLE["ink"],
+            "axes.titlecolor": STYLE["ink"],
+            "xtick.color": STYLE["ink"],
+            "ytick.color": STYLE["ink"],
+            "grid.color": STYLE["grid"],
+            "grid.linestyle": "--",
+            "grid.linewidth": 0.7,
+            "legend.frameon": False,
+            "axes.titlesize": 12,
+            "axes.labelsize": 10,
+            "xtick.labelsize": 8.5,
+            "ytick.labelsize": 8.5,
+        }
+    )
+
+
+def polish_axes(ax, *, grid_axis: str = "x") -> None:
+    ax.grid(axis=grid_axis, alpha=0.7)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color("#b8c0bd")
+    ax.spines["bottom"].set_color("#b8c0bd")
+
+
+def run_label(row: pd.Series) -> str:
+    run = str(row.get("run", ""))
+    labels = {
+        "outputs_v2_full_best": "Fusion full",
+        "outputs_v2_50pct_best": "Fusion 50%",
+        "outputs_v2_20pct_best": "Fusion 20%",
+        "outputs_v2_20pct_fusion_flat_seed123": "Fusion 20% seed123",
+        "outputs_v2_5pct_fusion_freq_flat": "Fusion 5%",
+        "outputs_v2_5pct_fusion_freq_binary_expert_ensemble": "Expert 5%",
+        "outputs_v2_5pct_fusion_freq_pairwise_ovo_attribution": "OVO 5%",
+        "outputs_v2_5pct_fusion_freq_hierarchical_attribution": "Hierarchical 5%",
+        "outputs_v2_5pct_color_freq_flat": "Color 5%",
+        "outputs_v2_5pct_block_dct_flat": "Block DCT 5%",
+        "outputs_v2_5pct_multiscale_freq_flat": "Multi-scale 5%",
+        "outputs_v2_5pct_residual_freq_flat": "Residual 5%",
+    }
+    if run in labels:
+        return labels[run]
+    profile = str(row.get("feature_profile", "")).replace("_freq", "").replace("_", " ").title()
+    frac = row.get("sample_fraction", "")
+    try:
+        frac_label = f"{float(frac) * 100:.0f}%"
+    except (TypeError, ValueError):
+        frac_label = str(frac)
+    return f"{profile} {frac_label}".strip()
 
 
 def parse_args() -> argparse.Namespace:
@@ -101,28 +170,39 @@ def add_selection(df: pd.DataFrame) -> pd.DataFrame:
 def save_plot(df: pd.DataFrame, figure_dir: Path) -> None:
     if df.empty or "combined_macro_f1" not in df:
         return
-    plot_df = df.sort_values("combined_macro_f1", ascending=True).tail(20).copy()
-    plot_df["label"] = (
-        plot_df["feature_profile"].astype(str)
-        + "\n"
-        + plot_df["model_architecture"].astype(str)
-        + "\naug="
-        + plot_df["train_augmentation"].astype(str)
-    )
-    fig, ax = plt.subplots(figsize=(7.2, max(4.0, 0.5 * len(plot_df))))
-    ax.barh(plot_df["label"], plot_df["combined_macro_f1"], color="#4f7fba")
-    ax.axvline(0.9041572078758394, color="#b34d4d", linestyle="--", linewidth=1.2, label="current full baseline")
-    ax.set_xlim(0, 1.05)
-    ax.set_xlabel("Average Macro-F1")
-    ax.set_title("Second-round frequency-first optimization")
+    plot_df = df.copy()
+    plot_df = plot_df[~plot_df["run"].astype(str).str.contains("smoke|robust", case=False, na=False)].copy()
+    if plot_df.empty:
+        return
+    plot_df = plot_df.sort_values("combined_macro_f1", ascending=False).head(10).iloc[::-1].copy()
+    plot_df["label"] = plot_df.apply(run_label, axis=1)
+    colors = [STYLE["green"] if bool(x) else STYLE["blue"] for x in plot_df["selected"]]
+
+    fig, ax = plt.subplots(figsize=(7.6, 4.6))
+    ax.barh(plot_df["label"], plot_df["combined_macro_f1"], color=colors, height=0.66)
+    ax.axvline(OLD_FULL_BASELINE, color=STYLE["plum"], linestyle="--", linewidth=1.3, label="Old gray full baseline")
+    for _, row in plot_df.iterrows():
+        ax.text(
+            float(row["combined_macro_f1"]) + 0.004,
+            row["label"],
+            f"{float(row['combined_macro_f1']):.3f}",
+            va="center",
+            fontsize=8.3,
+            color=STYLE["ink"],
+        )
+    ax.set_xlim(0.86, 1.02)
+    ax.set_xlabel("Combined Macro-F1 / 双任务平均 F1")
+    ax.set_title("Second-round frequency optimization / 第二轮频域优化")
     ax.legend(loc="lower right")
+    polish_axes(ax)
     plt.tight_layout()
-    plt.savefig(figure_dir / "optimization_v2_macro_f1.png", dpi=220)
+    plt.savefig(figure_dir / "optimization_v2_macro_f1.png", dpi=240, facecolor="white")
     plt.close()
 
 
 def main() -> None:
     args = parse_args()
+    apply_ppt_style()
     report_dir = Path(args.report_dir)
     table_dir = report_dir / "tables"
     figure_dir = report_dir / "figures"

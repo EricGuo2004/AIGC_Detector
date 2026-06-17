@@ -22,3 +22,4 @@ outputs_v2_20pct_best_mild_aug,fusion_freq,flat,mild_freq,0.2,42,True,wide,light
 outputs_v2_5pct_fusion_freq_hierarchical_attribution,fusion_freq,hierarchical_attribution,none,0.05,42,True,wide,lightgbm,0.9875,0.9874998611095678,0.9989402777777776,,,,,,False,not_selected
 outputs_v2_full_best_robust_20pct,,,none,0.2,42,False,,,,,,,,,,,False,not_selected
 outputs_v2_full_best_robust_smoke,,,none,0.01,42,False,,,,,,,,,,,False,not_selected
+outputs_v2_full_best_robust_smoke_v2,,,none,0.01,42,False,,,,,,,,,,,False,not_selected

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import csv
 import json
 import re
@@ -15,6 +16,7 @@ import pandas as pd
 TASKS = ["binary_ai_vs_nature", "ai_subsource_attribution"]
 REQUIRED_SPLITS = ["train/ai", "train/nature", "val/ai", "val/nature"]
 REQUIRED_GENERATORS = ["ADM", "BigGAN", "VQDM", "glide"]
+DATASET_ROOT_LABEL = "PATH_TO_GenImage_data"
 
 
 @dataclass
@@ -27,7 +29,7 @@ class Check:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate final AIGC_Detector submission assets.")
-    parser.add_argument("--dataset-root", default=r"C:\Users\99303\git\GenImage_data")
+    parser.add_argument("--dataset-root", default=os.environ.get("GENIMAGE_DATA_ROOT", "data/GenImage_data"))
     parser.add_argument("--report-dir", default="report")
     parser.add_argument("--primary-output", default="outputs_v2_full_best")
     parser.add_argument("--robustness-output", default="outputs_v2_full_best_robust_20pct")
@@ -54,13 +56,22 @@ def dir_exists(path: Path) -> bool:
     return path.exists() and path.is_dir()
 
 
+def display_dataset_path(path: Path, dataset_root: Path) -> str:
+    try:
+        rel = path.resolve().relative_to(dataset_root.resolve())
+        suffix = rel.as_posix().replace("/", "\\")
+        return DATASET_ROOT_LABEL if not suffix else f"{DATASET_ROOT_LABEL}\\{suffix}"
+    except ValueError:
+        return str(path)
+
+
 def check_dataset(checks: list[Check], dataset_root: Path) -> None:
-    add(checks, "dataset", "dataset root", dir_exists(dataset_root), str(dataset_root))
+    add(checks, "dataset", "dataset root", dir_exists(dataset_root), DATASET_ROOT_LABEL)
     if not dataset_root.exists():
         return
     for gen in REQUIRED_GENERATORS:
         gen_dir = dataset_root / gen
-        add(checks, "dataset", f"{gen} root", dir_exists(gen_dir), str(gen_dir))
+        add(checks, "dataset", f"{gen} root", dir_exists(gen_dir), display_dataset_path(gen_dir, dataset_root))
         for rel in REQUIRED_SPLITS:
             split_dir = gen_dir / rel
             count = 0

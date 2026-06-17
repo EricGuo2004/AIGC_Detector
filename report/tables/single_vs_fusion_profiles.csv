@@ -1,0 +1,13 @@
+profile,family,task,sample_fraction,macro_f1,accuracy,auc,run
+color_freq,single-domain,ai_subsource_attribution,0.05,0.9941610740119337,0.9941666666666666,,outputs_v2_5pct_color_freq_flat
+color_freq,single-domain,binary_ai_vs_nature,0.05,0.9833333333333332,0.9833333333333332,0.9983520833333334,outputs_v2_5pct_color_freq_flat
+multiscale_freq,single-domain,ai_subsource_attribution,0.05,0.900663155027844,0.9016666666666666,,outputs_v2_5pct_multiscale_freq_flat
+multiscale_freq,single-domain,binary_ai_vs_nature,0.05,0.9204033867456012,0.9204166666666668,0.9757020833333332,outputs_v2_5pct_multiscale_freq_flat
+block_dct,single-domain,ai_subsource_attribution,0.05,0.9766393911492632,0.9766666666666668,,outputs_v2_5pct_block_dct_flat
+block_dct,single-domain,binary_ai_vs_nature,0.05,0.9362460043068672,0.93625,0.9850909722222224,outputs_v2_5pct_block_dct_flat
+residual_freq,single-domain,ai_subsource_attribution,0.05,0.8951162258650762,0.8958333333333334,,outputs_v2_5pct_residual_freq_flat
+residual_freq,single-domain,binary_ai_vs_nature,0.05,0.9087499841579834,0.90875,0.9680486111111112,outputs_v2_5pct_residual_freq_flat
+fusion_freq,fusion,ai_subsource_attribution,0.05,0.9966652731442772,0.9966666666666668,,outputs_v2_5pct_fusion_freq_flat
+fusion_freq,fusion,binary_ai_vs_nature,0.05,0.987083331090856,0.9870833333333332,0.9989402777777776,outputs_v2_5pct_fusion_freq_flat
+fusion_freq_full,fusion,ai_subsource_attribution,1.0,0.9990832351600708,0.9990833333333332,,outputs_v2_full_best
+fusion_freq_full,fusion,binary_ai_vs_nature,1.0,0.9912499992556424,0.99125,0.9996183090277778,outputs_v2_full_best
